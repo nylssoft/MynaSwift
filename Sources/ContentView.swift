@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct ContentView: View {
@@ -18,40 +19,71 @@ struct ContentView: View {
             Text("Sample macOS app with skeleton dialogs.")
                 .foregroundStyle(.secondary)
             if isLoggedIn {
-                HStack(spacing: 8) {
-                    Text(userInfo.map { "Logged in as \($0.name)" } ?? "Logged in")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button("Log out") {
-                        AuthSessionStore.shared.clear()
-                        self.isLoggedIn = false
-                        self.authentication = nil
-                        self.userInfo = nil
+                HStack(alignment: .top, spacing: 12) {
+                    if let profileImageURL = profileImageURL {
+                        AsyncImage(url: profileImageURL) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            ProgressView()
+                        }
+                        .frame(width: 64, height: 64)
+                        .clipShape(Circle())
                     }
-                    .font(.caption)
-                    .buttonStyle(.link)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(displayName)
+                            .font(.headline)
+
+                        if let email = userInfo?.email, !email.isEmpty {
+                            Text(email)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if let lastLoginText {
+                            Text("Last login: \(lastLoginText)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if let registeredText {
+                            Text("Registered: \(registeredText)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Button("Log out") {
+                            AuthSessionStore.shared.clear()
+                            self.isLoggedIn = false
+                            self.authentication = nil
+                            self.userInfo = nil
+                        }
+                        .font(.caption)
+                        .buttonStyle(.link)
+                    }
                 }
             } else if isCheckingStoredSession {
                 ProgressView("Validating saved session...")
                     .controlSize(.small)
             }
             HStack(spacing: 10) {
-                Button(isLoggedIn ? "Switch User" : "Show Login Dialog") {
+                Button(isLoggedIn ? "Switch User" : "Login") {
                     showLoginDialog = true
-                }
-                Button("Show About Dialog") {
-                    AppDialogController.shared.showAboutDialog()
                 }
             }
         }
         .padding(24)
         .frame(minWidth: 480, minHeight: 260)
         .sheet(isPresented: $showLoginDialog) {
-            LoginDialogView(isPresented: $showLoginDialog) { (authentication, userInfo) in
-                isLoggedIn = true
-                self.authentication = authentication
-                self.userInfo = userInfo
-            }
+            LoginDialogView(
+                isPresented: $showLoginDialog,
+                onAuthenticated: { (authentication, userInfo) in
+                    isLoggedIn = true
+                    self.authentication = authentication
+                    self.userInfo = userInfo
+                })
         }
         .sheet(isPresented: $showPinDialog) {
             PinDialogView(
@@ -62,6 +94,7 @@ struct ContentView: View {
                 onCancel: {
                     pendingLongLivedTokenForPin = nil
                     AuthSessionStore.shared.clear()
+                    presentStartupLoginDialog()
                 })
         }
         .task {
@@ -75,6 +108,7 @@ struct ContentView: View {
             return
         }
         guard let session = AuthSessionStore.shared.load() else {
+            presentStartupLoginDialog()
             return
         }
         isCheckingStoredSession = true
@@ -90,6 +124,7 @@ struct ContentView: View {
             guard let token = authentication.token
             else {
                 AuthSessionStore.shared.clear()
+                presentStartupLoginDialog()
                 return
             }
             let userInfo = try await authenticationService.getUserInfo(token: token)
@@ -99,7 +134,13 @@ struct ContentView: View {
             AuthSessionStore.shared.save(from: authentication)
         } catch {
             AuthSessionStore.shared.clear()
+            presentStartupLoginDialog()
         }
+    }
+
+    @MainActor
+    private func presentStartupLoginDialog() {
+        showLoginDialog = true
     }
 
     @MainActor
@@ -121,5 +162,56 @@ struct ContentView: View {
         self.isLoggedIn = true
         pendingLongLivedTokenForPin = nil
         AuthSessionStore.shared.save(from: authentication)
+    }
+
+    private var displayName: String {
+        guard let name = userInfo?.name, !name.isEmpty else {
+            return "Logged in"
+        }
+        return name
+    }
+
+    private var profileImageURL: URL? {
+        guard let photo = userInfo?.photo,
+            !photo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return nil
+        }
+        return URL(string: photo, relativeTo: URL(string: "https://www.stockfleth.eu"))
+    }
+
+    private var lastLoginText: String? {
+        guard let lastLoginUtc = userInfo?.lastLoginUtc,
+            let date = parseUTCISODate(lastLoginUtc)
+        else {
+            return nil
+        }
+        return displayDateFormatter.string(from: date)
+    }
+
+    private var registeredText: String? {
+        guard let registeredUtc = userInfo?.registeredUtc,
+            let date = parseUTCISODate(registeredUtc)
+        else {
+            return nil
+        }
+        return displayDateFormatter.string(from: date)
+    }
+
+    private var displayDateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }
+
+    private func parseUTCISODate(_ value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) {
+            return date
+        }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
     }
 }
