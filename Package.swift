@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "MynaSwift",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v14)
     ],
     products: [
         .executable(name: "MynaSwift", targets: ["MynaSwift"])

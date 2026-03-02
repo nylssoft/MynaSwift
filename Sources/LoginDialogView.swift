@@ -1,8 +1,14 @@
 import SwiftUI
 
 struct LoginDialogView: View {
+    private enum Field {
+        case username
+        case password
+        case secondFactor
+    }
+
     @Binding var isPresented: Bool
-    var onAuthenticated: ((AuthenticationResponse) -> Void)?
+    var onAuthenticated: ((AuthenticationResponse, UserInfoResponse) -> Void)?
     private let authenticationService: AuthenticationServicing = RemoteAuthenticationService()
 
     @State private var username = ""
@@ -12,6 +18,7 @@ struct LoginDialogView: View {
     @State private var pendingSecondFactorToken: String?
     @State private var isAuthenticating = false
     @State private var errorMessage: String?
+    @FocusState private var focusedField: Field?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -20,13 +27,23 @@ struct LoginDialogView: View {
 
             TextField("Username", text: $username)
                 .textFieldStyle(.roundedBorder)
+                .disabled(isAwaitingSecondFactor)
+                .focused($focusedField, equals: .username)
 
             SecureField("Password", text: $password)
                 .textFieldStyle(.roundedBorder)
+                .disabled(isAwaitingSecondFactor)
+                .focused($focusedField, equals: .password)
 
             if isAwaitingSecondFactor {
                 TextField("Second factor code", text: $secondFactorCode)
                     .textFieldStyle(.roundedBorder)
+                    .focused($focusedField, equals: .secondFactor)
+                    .onAppear {
+                        DispatchQueue.main.async {
+                            focusedField = .secondFactor
+                        }
+                    }
             }
 
             if let errorMessage {
@@ -70,19 +87,28 @@ struct LoginDialogView: View {
         }
         .padding(20)
         .frame(width: 360)
+        .onChange(of: isAwaitingSecondFactor) { _, newValue in
+            if newValue {
+                DispatchQueue.main.async {
+                    focusedField = .secondFactor
+                }
+            } else {
+                focusedField = .username
+            }
+        }
+        .onAppear {
+            focusedField = .username
+        }
     }
 
     @MainActor
     private func signIn() async {
         isAuthenticating = true
         errorMessage = nil
-
         do {
-            let request = try authenticationService.makeRequest(username: username, password: password)
-            let response = try await authenticationService.authenticate(request)
-
-            if response.requiresPass2 {
-                guard let token = response.token,
+            let authentication = try await authenticationService.authenticate(username: username, password: password)
+            if authentication.requiresPass2 {
+                guard let token = authentication.token,
                       !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     throw AuthenticationError.twoFactorTokenMissing
                 }
@@ -91,9 +117,9 @@ struct LoginDialogView: View {
                 isAuthenticating = false
                 return
             }
-
-            AuthSessionStore.shared.save(from: response)
-            onAuthenticated?(response)
+            let userInfo = try await authenticationService.getUserInfo(token: authentication.token!)
+            AuthSessionStore.shared.save(from: authentication)
+            onAuthenticated?(authentication, userInfo)
             isPresented = false
         } catch {
             if let authenticationError = error as? AuthenticationError {
@@ -102,7 +128,6 @@ struct LoginDialogView: View {
                 errorMessage = "Unexpected authentication error."
             }
         }
-
         isAuthenticating = false
     }
 
@@ -112,17 +137,16 @@ struct LoginDialogView: View {
             errorMessage = "No pending authentication request."
             return
         }
-
         isAuthenticating = true
         errorMessage = nil
-
         do {
-            let response = try await authenticationService.completeSecondFactor(
+            let authentication = try await authenticationService.completeSecondFactor(
                 token: pendingSecondFactorToken,
                 secondFactorCode: secondFactorCode
             )
-            AuthSessionStore.shared.save(from: response)
-            onAuthenticated?(response)
+            let userInfo = try await authenticationService.getUserInfo(token: authentication.token!)           
+            AuthSessionStore.shared.save(from: authentication)
+            onAuthenticated?(authentication, userInfo)
             isPresented = false
         } catch {
             if let authenticationError = error as? AuthenticationError {
@@ -131,7 +155,6 @@ struct LoginDialogView: View {
                 errorMessage = "Unexpected authentication error."
             }
         }
-
         isAuthenticating = false
     }
 }
