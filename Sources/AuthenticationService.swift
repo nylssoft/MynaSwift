@@ -1,23 +1,27 @@
 import Foundation
 
 struct UserInfoResponse: Decodable {
-    // let id: Int64?
-    let name: String?
-    // let email: String?
-    // let requires2FA: Bool?
-    // let useLongLivedToken: Bool?
-    // let allowResetPassword: Bool?
-    // let lastLoginUtc: Int64?
-    // let registeredUtc: Int64?
-    // let roles: [String]?
-    // let hasPasswordManagerFile: Bool?
-    // let passwordManagerSalt: String?
-    // let accountLocked: Bool?
+    let id: Int64
+    let name: String
+    let email: String
+    let requires2FA: Bool
+    let useLongLivedToken: Bool
+    let usePin: Bool
+    let allowResetPassword: Bool
+    let lastLoginUtc: String
+    let registeredUtc: String
+    let roles: [String]
+    let passwordManagerSalt: String
+    let accountLocked: Bool
     let photo: String?
-    // let storageQuota: Int64?
-    // let usedStorage: Int64?
-    // let loginEnabled: Bool?
-    // let secKey: String?
+    let storageQuota: Int64
+    let usedStorage: Int64
+    let loginEnabled: Bool
+    let hasContacts: Bool
+    let hasDiary: Bool
+    let hasNotes: Bool
+    let hasPasswordManagerFile: Bool
+    let secKey: String
 }
 
 struct AuthenticationResponse: Decodable {
@@ -65,10 +69,17 @@ enum AuthenticationError: LocalizedError {
 }
 
 protocol AuthenticationServicing {
+
     func authenticate(username: String, password: String) async throws -> AuthenticationResponse
+
+    func authenticateLongLivedToken(longLivedToken: String) async throws -> AuthenticationResponse
+
     func completeSecondFactor(token: String, secondFactorCode: String) async throws
         -> AuthenticationResponse
+
     func getUserInfo(token: String) async throws -> UserInfoResponse
+    
+    func completePin(longLivedToken: String, pin: String) async throws -> AuthenticationResponse
 }
 
 struct ClientIdentity {
@@ -173,8 +184,33 @@ struct RemoteAuthenticationService: AuthenticationServicing {
         return try JSONDecoder().decode(AuthenticationResponse.self, from: data)
     }
 
+    func authenticateLongLivedToken(longLivedToken: String) async throws -> AuthenticationResponse {
+        let clientIdentity: ClientIdentity = ClientIdentityStore.shared.loadOrCreateIdentity()
+        var urlRequest = URLRequest(
+            url: URL(string: "/api/pwdman/auth/lltoken", relativeTo: baseURL)!)
+        urlRequest.httpMethod = "GET"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue(longLivedToken, forHTTPHeaderField: "token")
+        urlRequest.setValue(clientIdentity.uuid, forHTTPHeaderField: "uuid")
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        try checkResponse(response, data: data)
+        return try JSONDecoder().decode(AuthenticationResponse.self, from: data)
+    }
+
+    func completePin(longLivedToken: String, pin: String) async throws -> AuthenticationResponse {
+        var urlRequest = URLRequest(url: URL(string: "/api/pwdman/auth/pin", relativeTo: baseURL)!)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue(longLivedToken, forHTTPHeaderField: "token")
+        urlRequest.httpBody = try JSONEncoder().encode(pin)
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        try checkResponse(response, data: data)
+        return try JSONDecoder().decode(AuthenticationResponse.self, from: data)
+    }
+
     func getUserInfo(token: String) async throws -> UserInfoResponse {
-        var urlRequest = URLRequest(url: URL(string: "/api/pwdman/user", relativeTo: baseURL)!)
+        var urlRequest = URLRequest(
+            url: URL(string: "/api/pwdman/user?details=true", relativeTo: baseURL)!)
         urlRequest.httpMethod = "GET"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue(token, forHTTPHeaderField: "token")

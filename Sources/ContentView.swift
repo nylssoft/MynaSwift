@@ -2,10 +2,12 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var showLoginDialog = false
+    @State private var showPinDialog = false
     @State private var isLoggedIn = false
     @State private var userInfo: UserInfoResponse?
     @State private var authentication: AuthenticationResponse?
     @State private var isCheckingStoredSession = false
+    @State private var pendingLongLivedTokenForPin: String?
 
     private let authenticationService: AuthenticationServicing = RemoteAuthenticationService()
 
@@ -17,7 +19,7 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
             if isLoggedIn {
                 HStack(spacing: 8) {
-                    Text(userInfo.map { "Logged in as \($0.name!)" } ?? "Logged in")
+                    Text(userInfo.map { "Logged in as \($0.name)" } ?? "Logged in")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button("Log out") {
@@ -51,6 +53,17 @@ struct ContentView: View {
                 self.userInfo = userInfo
             }
         }
+        .sheet(isPresented: $showPinDialog) {
+            PinDialogView(
+                isPresented: $showPinDialog,
+                onSubmit: { pin in
+                    try await completePinAuthentication(pin: pin)
+                },
+                onCancel: {
+                    pendingLongLivedTokenForPin = nil
+                    AuthSessionStore.shared.clear()
+                })
+        }
         .task {
             await authenticateStoredSessionOnStartup()
         }
@@ -67,13 +80,46 @@ struct ContentView: View {
         isCheckingStoredSession = true
         defer { isCheckingStoredSession = false }
         do {
-            let isValid = true // try await authenticationService.validateStoredSession(session)
-            if isValid {
-                // TODO authenticate with longLivedToken
-            } else {
+            let authentication = try await authenticationService.authenticateLongLivedToken(
+                longLivedToken: session.longLivedToken)
+            if authentication.requiresPin {
+                pendingLongLivedTokenForPin = session.longLivedToken
+                showPinDialog = true
+                return
             }
+            guard let token = authentication.token
+            else {
+                AuthSessionStore.shared.clear()
+                return
+            }
+            let userInfo = try await authenticationService.getUserInfo(token: token)
+            self.authentication = authentication
+            self.userInfo = userInfo
+            self.isLoggedIn = true
+            AuthSessionStore.shared.save(from: authentication)
         } catch {
             AuthSessionStore.shared.clear()
         }
+    }
+
+    @MainActor
+    private func completePinAuthentication(pin: String) async throws {
+        guard let token = pendingLongLivedTokenForPin
+        else {
+            throw AuthenticationError.twoFactorTokenMissing
+        }
+        let authentication = try await authenticationService.completePin(
+            longLivedToken: token, pin: pin)
+        guard let token = authentication.token
+        else {
+            throw AuthenticationError.serverError(
+                "PIN authentication did not return an access token.")
+        }
+        let userInfo = try await authenticationService.getUserInfo(token: token)
+        self.authentication = authentication
+        self.userInfo = userInfo
+        self.isLoggedIn = true
+        pendingLongLivedTokenForPin = nil
+        AuthSessionStore.shared.save(from: authentication)
     }
 }
