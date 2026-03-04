@@ -58,8 +58,20 @@ struct ContentView: View {
     @State private var showDataProtectionDialog = false
     @State private var dataProtectionSecurityKey = ""
     @State private var isLoggingOut = false
+    @State private var contactItems: [ContactItem] = []
+    @State private var isLoadingContacts = false
+    @State private var isUploadingContacts = false
+    @State private var contactsErrorMessage: String?
+    @State private var hasLoadedContacts = false
+    @State private var selectedContactID: Int64?
+    @State private var contactNameDraft = ""
+    @State private var contactBirthdayDraft = ""
+    @State private var contactPhoneDraft = ""
+    @State private var contactAddressDraft = ""
+    @State private var contactEmailDraft = ""
+    @State private var contactNoteDraft = ""
 
-    private let authenticationService: AuthenticationServicing = RemoteAuthenticationService()
+    private let service: Servicing = RemoteService()
 
     var body: some View {
         HStack(spacing: 0) {
@@ -163,12 +175,18 @@ struct ContentView: View {
             await initializeTranslationsOnStartup()
             await authenticateStoredSessionOnStartup()
         }
+        .task(id: selectedSection) {
+            guard selectedSection == .contacts else {
+                return
+            }
+            await loadContactItemsIfNeeded(force: false)
+        }
     }
 
     @MainActor
     private func initializeTranslationsOnStartup() async {
         do {
-            try await authenticationService.initializeTranslations(locale: "en")
+            try await service.initializeTranslations(locale: "en")
         } catch {
         }
     }
@@ -185,7 +203,7 @@ struct ContentView: View {
         isCheckingStoredSession = true
         defer { isCheckingStoredSession = false }
         do {
-            let authentication = try await authenticationService.authenticateLongLivedToken(
+            let authentication = try await service.authenticateLongLivedToken(
                 longLivedToken: session.longLivedToken)
             if authentication.requiresPin {
                 pendingLongLivedTokenForPin = session.longLivedToken
@@ -198,7 +216,7 @@ struct ContentView: View {
                 presentStartupLoginDialog()
                 return
             }
-            let userInfo = try await authenticationService.getUserInfo(token: token)
+            let userInfo = try await service.getUserInfo(token: token)
             self.authentication = authentication
             self.userInfo = userInfo
             self.isLoggedIn = true
@@ -219,16 +237,16 @@ struct ContentView: View {
     private func completePinAuthentication(pin: String) async throws {
         guard let token = pendingLongLivedTokenForPin
         else {
-            throw AuthenticationError.twoFactorTokenMissing
+            throw ServiceError.twoFactorTokenMissing
         }
-        let authentication = try await authenticationService.completePin(
+        let authentication = try await service.completePin(
             longLivedToken: token, pin: pin)
         guard let token = authentication.token
         else {
-            throw AuthenticationError.serverError(
+            throw ServiceError.serverError(
                 "PIN authentication did not return an access token.")
         }
-        let userInfo = try await authenticationService.getUserInfo(token: token)
+        let userInfo = try await service.getUserInfo(token: token)
         self.authentication = authentication
         self.userInfo = userInfo
         self.isLoggedIn = true
@@ -272,7 +290,7 @@ struct ContentView: View {
         defer { isLoggingOut = false }
         if let token = authentication?.token, !token.isEmpty {
             do {
-                try await authenticationService.logout(token: token)
+                try await service.logout(token: token)
             } catch {
             }
         }
@@ -281,6 +299,141 @@ struct ContentView: View {
         self.authentication = nil
         self.userInfo = nil
         self.dataProtectionSecurityKey = ""
+        self.contactItems = []
+        self.contactsErrorMessage = nil
+        self.hasLoadedContacts = false
+        clearContactSelection()
+    }
+
+    @MainActor
+    private func loadContactItemsIfNeeded(force: Bool) async {
+        if isLoadingContacts {
+            return
+        }
+        if hasLoadedContacts && !force {
+            return
+        }
+        guard let token = authentication?.token,
+            !token.isEmpty,
+            let salt = userInfo?.passwordManagerSalt,
+            !salt.isEmpty,
+            !dataProtectionSecurityKey.isEmpty
+        else {
+            contactsErrorMessage = "Set your data protection key to load contacts."
+            contactItems = []
+            hasLoadedContacts = false
+            return
+        }
+
+        isLoadingContacts = true
+        contactsErrorMessage = nil
+        defer { isLoadingContacts = false }
+
+        do {
+            let items = try await service.getContactItems(
+                token: token,
+                encryptionKey: dataProtectionSecurityKey,
+                passwordManagerSalt: salt)
+            contactItems = items
+            hasLoadedContacts = true
+            clearContactSelection()
+        } catch {
+            contactsErrorMessage =
+                (error as? LocalizedError)?.errorDescription ?? "Failed to load contacts."
+            contactItems = []
+            hasLoadedContacts = false
+            clearContactSelection()
+        }
+    }
+
+    @MainActor
+    private func uploadContactItems() async {
+        if isUploadingContacts {
+            return
+        }
+        guard let token = authentication?.token,
+            !token.isEmpty,
+            let salt = userInfo?.passwordManagerSalt,
+            !salt.isEmpty,
+            !dataProtectionSecurityKey.isEmpty
+        else {
+            contactsErrorMessage = "Set your data protection key to upload contacts."
+            return
+        }
+
+        isUploadingContacts = true
+        contactsErrorMessage = nil
+        defer { isUploadingContacts = false }
+
+        do {
+            try await service.uploadContactItems(
+                token: token,
+                contactItems: contactItems,
+                encryptionKey: dataProtectionSecurityKey,
+                passwordManagerSalt: salt)
+        } catch {
+            contactsErrorMessage =
+                (error as? LocalizedError)?.errorDescription ?? "Failed to upload contacts."
+        }
+    }
+
+    private func clearContactSelection() {
+        selectedContactID = nil
+        contactNameDraft = ""
+        contactBirthdayDraft = ""
+        contactPhoneDraft = ""
+        contactAddressDraft = ""
+        contactEmailDraft = ""
+        contactNoteDraft = ""
+    }
+
+    private func selectContact(_ item: ContactItem) {
+        selectedContactID = item.id
+        contactNameDraft = item.name
+        contactBirthdayDraft = item.birthday
+        contactPhoneDraft = item.phone
+        contactAddressDraft = item.address
+        contactEmailDraft = item.email
+        contactNoteDraft = item.note
+    }
+
+    private func createContact() {
+        let nextID = (contactItems.map(\.id).max() ?? 0) + 1
+        let newContact = ContactItem(
+            id: nextID,
+            name: "",
+            birthday: "",
+            phone: "",
+            address: "",
+            email: "",
+            note: "")
+        contactItems.append(newContact)
+        contactItems.sort { $0.id < $1.id }
+        selectContact(newContact)
+    }
+
+    private func saveSelectedContactChanges() {
+        guard let selectedContactID,
+            let index = contactItems.firstIndex(where: { $0.id == selectedContactID })
+        else {
+            return
+        }
+        contactItems[index].name = contactNameDraft
+        contactItems[index].birthday = contactBirthdayDraft
+        contactItems[index].phone = contactPhoneDraft
+        contactItems[index].address = contactAddressDraft
+        contactItems[index].email = contactEmailDraft
+        contactItems[index].note = contactNoteDraft
+        contactsErrorMessage = nil
+    }
+
+    private func deleteSelectedContact() {
+        guard let selectedContactID else {
+            return
+        }
+        contactItems.removeAll { $0.id == selectedContactID }
+        clearContactSelection()
+        contactsErrorMessage = nil
     }
 
     private var displayName: String {
@@ -348,11 +501,125 @@ struct ContentView: View {
         case .passwords:
             SectionSkeletonView(title: "Passwords", subtitle: "Manage all passwords")
         case .contacts:
-            SectionSkeletonView(title: "Contacts", subtitle: "Manage all contacts")
+            contactsSectionView
         case .appointments:
             SectionSkeletonView(title: "Appointments", subtitle: "Manage all appointments")
         case .diaryEntries:
             SectionSkeletonView(title: "Diary Entries", subtitle: "Manage all diary entries")
+        }
+    }
+
+    private var contactsSectionView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Contacts")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("Manage encrypted contact items")
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button("Reload") {
+                    Task {
+                        await loadContactItemsIfNeeded(force: true)
+                    }
+                }
+                .disabled(isLoadingContacts || !isLoggedIn)
+
+                Button("Upload") {
+                    Task {
+                        await uploadContactItems()
+                    }
+                }
+                .disabled(isUploadingContacts || isLoadingContacts || !isLoggedIn)
+            }
+
+            if isLoadingContacts || isUploadingContacts {
+                ProgressView(isUploadingContacts ? "Uploading contacts..." : "Loading contacts...")
+                    .controlSize(.small)
+            }
+
+            if let contactsErrorMessage {
+                Text(contactsErrorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+
+            if contactItems.isEmpty {
+                Text("No contacts available.")
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+            } else {
+                List(contactItems) { item in
+                    Button {
+                        selectContact(item)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.name.isEmpty ? "(No name)" : item.name)
+                                .font(.headline)
+                            if !item.email.isEmpty {
+                                Text(item.email)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else if !item.phone.isEmpty {
+                                Text(item.phone)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(
+                        selectedContactID == item.id ? Color.primary.opacity(0.12) : Color.clear
+                    )
+                }
+                .frame(minHeight: 170)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Button("New") {
+                        createContact()
+                    }
+                    .disabled(!isLoggedIn || isLoadingContacts || isUploadingContacts)
+
+                    Button("Save Changes") {
+                        saveSelectedContactChanges()
+                    }
+                    .disabled(selectedContactID == nil || isLoadingContacts || isUploadingContacts)
+
+                    Button("Delete") {
+                        deleteSelectedContact()
+                    }
+                    .disabled(selectedContactID == nil || isLoadingContacts || isUploadingContacts)
+                }
+
+                TextField("Name", text: $contactNameDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(selectedContactID == nil)
+                HStack(spacing: 10) {
+                    TextField("Birthday", text: $contactBirthdayDraft)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(selectedContactID == nil)
+                    TextField("Phone", text: $contactPhoneDraft)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(selectedContactID == nil)
+                }
+                TextField("Email", text: $contactEmailDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(selectedContactID == nil)
+                TextField("Address", text: $contactAddressDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(selectedContactID == nil)
+                TextField("Note", text: $contactNoteDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(selectedContactID == nil)
+            }
         }
     }
 

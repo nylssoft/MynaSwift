@@ -9,7 +9,7 @@ struct LoginDialogView: View {
 
     @Binding var isPresented: Bool
     var onAuthenticated: ((AuthenticationResponse, UserInfoResponse) -> Void)?
-    private let authenticationService: AuthenticationServicing = RemoteAuthenticationService()
+    private let service: Servicing = RemoteService()
 
     @State private var username = ""
     @State private var password = ""
@@ -120,25 +120,25 @@ struct LoginDialogView: View {
         isAuthenticating = true
         errorMessage = nil
         do {
-            let authentication = try await authenticationService.authenticate(
+            let authentication = try await service.authenticate(
                 username: username, password: password)
             if authentication.requiresPass2 {
                 guard let token = authentication.token,
                     !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 else {
-                    throw AuthenticationError.twoFactorTokenMissing
+                    throw ServiceError.twoFactorTokenMissing
                 }
                 pendingSecondFactorToken = token
                 isAwaitingSecondFactor = true
                 isAuthenticating = false
                 return
             }
-            let userInfo = try await authenticationService.getUserInfo(token: authentication.token!)
+            let userInfo = try await service.getUserInfo(token: authentication.token!)
             AuthSessionStore.shared.persistSession(from: authentication, keepLogin: keepLogin)
             onAuthenticated?(authentication, userInfo)
             isPresented = false
         } catch {
-            if let authenticationError = error as? AuthenticationError {
+            if let authenticationError = error as? ServiceError {
                 errorMessage = authenticationError.errorDescription
             } else {
                 errorMessage = "Unexpected authentication error."
@@ -156,16 +156,16 @@ struct LoginDialogView: View {
         isAuthenticating = true
         errorMessage = nil
         do {
-            let authentication = try await authenticationService.completeSecondFactor(
+            let authentication = try await service.completeSecondFactor(
                 token: pendingSecondFactorToken,
                 secondFactorCode: secondFactorCode
             )
-            let userInfo = try await authenticationService.getUserInfo(token: authentication.token!)
+            let userInfo = try await service.getUserInfo(token: authentication.token!)
             AuthSessionStore.shared.persistSession(from: authentication, keepLogin: keepLogin)
             onAuthenticated?(authentication, userInfo)
             isPresented = false
         } catch {
-            if let authenticationError = error as? AuthenticationError {
+            if let authenticationError = error as? ServiceError {
                 errorMessage = authenticationError.errorDescription
             } else {
                 errorMessage = "Unexpected authentication error."

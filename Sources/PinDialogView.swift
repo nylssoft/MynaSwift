@@ -71,7 +71,7 @@ struct PinDialogView: View {
             try await onSubmit(pin)
             isPresented = false
         } catch {
-            if let authenticationError = error as? AuthenticationError {
+            if let authenticationError = error as? ServiceError {
                 errorMessage = authenticationError.errorDescription
             } else {
                 errorMessage = "Unexpected PIN authentication error."
