@@ -18,7 +18,7 @@ enum AppIconFactory {
 
         let gradient = NSGradient(colors: [
             NSColor(srgbRed: 0.16, green: 0.26, blue: 0.84, alpha: 1.0),
-            NSColor(srgbRed: 0.28, green: 0.48, blue: 0.96, alpha: 1.0)
+            NSColor(srgbRed: 0.28, green: 0.48, blue: 0.96, alpha: 1.0),
         ])
         gradient?.draw(in: backgroundPath, angle: 90)
 
@@ -80,7 +80,8 @@ enum AppIconFactory {
         shackle.move(to: NSPoint(x: shackleCenterX - size * 0.07, y: shackleBottomY))
         shackle.curve(
             to: NSPoint(x: shackleCenterX + size * 0.07, y: shackleBottomY),
-            controlPoint1: NSPoint(x: shackleCenterX - size * 0.07, y: shackleBottomY + size * 0.14),
+            controlPoint1: NSPoint(
+                x: shackleCenterX - size * 0.07, y: shackleBottomY + size * 0.14),
             controlPoint2: NSPoint(x: shackleCenterX + size * 0.07, y: shackleBottomY + size * 0.14)
         )
         shackle.lineWidth = size * 0.03
