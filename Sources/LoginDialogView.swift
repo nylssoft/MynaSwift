@@ -18,6 +18,7 @@ struct LoginDialogView: View {
     @State private var pendingSecondFactorToken: String?
     @State private var isAuthenticating = false
     @State private var errorMessage: String?
+    @State private var keepLogin = AuthSessionStore.shared.keepLoginEnabled
     @FocusState private var focusedField: Field?
 
     var body: some View {
@@ -34,6 +35,12 @@ struct LoginDialogView: View {
                 .textFieldStyle(.roundedBorder)
                 .disabled(isAwaitingSecondFactor)
                 .focused($focusedField, equals: .password)
+
+            Toggle("Keep me signed in", isOn: $keepLogin)
+                .disabled(isAuthenticating)
+                .onChange(of: keepLogin) { _, newValue in
+                    AuthSessionStore.shared.setKeepLoginEnabled(newValue)
+                }
 
             if isAwaitingSecondFactor {
                 TextField("Second factor code", text: $secondFactorCode)
@@ -67,7 +74,11 @@ struct LoginDialogView: View {
                         }
                     }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(isAuthenticating || secondFactorCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        isAuthenticating
+                            || secondFactorCode.trimmingCharacters(in: .whitespacesAndNewlines)
+                                .isEmpty
+                    )
                 } else {
                     Button("Sign In") {
                         Task {
@@ -75,7 +86,10 @@ struct LoginDialogView: View {
                         }
                     }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(isAuthenticating || username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        isAuthenticating
+                            || username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
             .padding(.top, 8)
@@ -106,10 +120,12 @@ struct LoginDialogView: View {
         isAuthenticating = true
         errorMessage = nil
         do {
-            let authentication = try await authenticationService.authenticate(username: username, password: password)
+            let authentication = try await authenticationService.authenticate(
+                username: username, password: password)
             if authentication.requiresPass2 {
                 guard let token = authentication.token,
-                      !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                else {
                     throw AuthenticationError.twoFactorTokenMissing
                 }
                 pendingSecondFactorToken = token
@@ -118,7 +134,7 @@ struct LoginDialogView: View {
                 return
             }
             let userInfo = try await authenticationService.getUserInfo(token: authentication.token!)
-            AuthSessionStore.shared.save(from: authentication)
+            AuthSessionStore.shared.persistSession(from: authentication, keepLogin: keepLogin)
             onAuthenticated?(authentication, userInfo)
             isPresented = false
         } catch {
@@ -144,8 +160,8 @@ struct LoginDialogView: View {
                 token: pendingSecondFactorToken,
                 secondFactorCode: secondFactorCode
             )
-            let userInfo = try await authenticationService.getUserInfo(token: authentication.token!)           
-            AuthSessionStore.shared.save(from: authentication)
+            let userInfo = try await authenticationService.getUserInfo(token: authentication.token!)
+            AuthSessionStore.shared.persistSession(from: authentication, keepLogin: keepLogin)
             onAuthenticated?(authentication, userInfo)
             isPresented = false
         } catch {

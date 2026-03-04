@@ -69,7 +69,9 @@ struct ContentView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .frame(width: 32, height: 32)
                             .foregroundStyle(selectedSection == section ? .primary : .secondary)
-                            .background(selectedSection == section ? Color.primary.opacity(0.12) : .clear)
+                            .background(
+                                selectedSection == section ? Color.primary.opacity(0.12) : .clear
+                            )
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
                     .buttonStyle(.plain)
@@ -132,7 +134,16 @@ struct ContentView: View {
                 })
         }
         .task {
+            await initializeTranslationsOnStartup()
             await authenticateStoredSessionOnStartup()
+        }
+    }
+
+    @MainActor
+    private func initializeTranslationsOnStartup() async {
+        do {
+            try await authenticationService.initializeTranslations(locale: "en")
+        } catch {
         }
     }
 
@@ -271,8 +282,10 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Personal Workspace")
                 .font(.largeTitle)
-            Text("Organize your notes, documents, passwords, contacts, appointments, and diary entries in one place.")
-                .foregroundStyle(.secondary)
+            Text(
+                "Organize your notes, documents, passwords, contacts, appointments, and diary entries in one place."
+            )
+            .foregroundStyle(.secondary)
         }
     }
 

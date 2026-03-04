@@ -78,8 +78,12 @@ protocol AuthenticationServicing {
         -> AuthenticationResponse
 
     func getUserInfo(token: String) async throws -> UserInfoResponse
-    
+
     func completePin(longLivedToken: String, pin: String) async throws -> AuthenticationResponse
+
+    func initializeTranslations(locale: String) async throws
+
+    func translate(symbol: String) -> String
 }
 
 struct ClientIdentity {
@@ -122,11 +126,29 @@ final class AuthSessionStore {
 
     private enum Keys {
         static let longLivedToken = "mynaswift.session.longLivedToken"
+        static let keepLoginEnabled = "mynaswift.session.keepLoginEnabled"
     }
 
     private let defaults = UserDefaults.standard
 
     private init() {}
+
+    var keepLoginEnabled: Bool {
+        defaults.object(forKey: Keys.keepLoginEnabled) as? Bool ?? true
+    }
+
+    func setKeepLoginEnabled(_ enabled: Bool) {
+        defaults.set(enabled, forKey: Keys.keepLoginEnabled)
+    }
+
+    func persistSession(from response: AuthenticationResponse, keepLogin: Bool) {
+        setKeepLoginEnabled(keepLogin)
+        guard keepLogin else {
+            clear()
+            return
+        }
+        save(from: response)
+    }
 
     func save(from response: AuthenticationResponse) {
         guard let longLivedToken = response.longLivedToken,
@@ -153,6 +175,56 @@ final class AuthSessionStore {
 
 struct RemoteAuthenticationService: AuthenticationServicing {
     private let baseURL = URL(string: "https://www.stockfleth.eu")
+    private static let translationQueue = DispatchQueue(
+        label: "mynaswift.translation.map", attributes: .concurrent)
+    private static var translationMap: [String: String]?
+
+    func initializeTranslations(locale: String) async throws {
+        let localeURLRequest = URLRequest(
+            url: URL(string: "/api/pwdman/locale/url/\(locale)", relativeTo: baseURL)!)
+        let (localeData, localeResponse) = try await URLSession.shared.data(for: localeURLRequest)
+        try checkResponse(localeResponse, data: localeData)
+        let localeURLString = try JSONDecoder().decode(String.self, from: localeData)
+        let translationURL: URL
+        if let absoluteURL = URL(string: localeURLString), absoluteURL.scheme != nil {
+            translationURL = absoluteURL
+        } else {
+            guard let relativeURL = URL(string: localeURLString, relativeTo: baseURL)?.absoluteURL
+            else {
+                throw AuthenticationError.invalidURL
+            }
+            translationURL = relativeURL
+        }
+        let translationRequest = URLRequest(url: translationURL)
+        let (translationData, translationResponse) = try await URLSession.shared.data(
+            for: translationRequest)
+        try checkResponse(translationResponse, data: translationData)
+        let map = try JSONDecoder().decode([String: String].self, from: translationData)
+        Self.translationQueue.sync(flags: .barrier) {
+            Self.translationMap = map
+        }
+    }
+
+    func translate(symbol: String) -> String {
+        let map = Self.translationQueue.sync {
+            Self.translationMap
+        }
+        guard let map else {
+            return symbol
+        }
+        let components = symbol.split(separator: ":", omittingEmptySubsequences: false).map(
+            String.init)
+        if components.count > 1 {
+            guard var format = map[components[0]] else {
+                return symbol
+            }
+            for index in 1..<components.count {
+                format = format.replacingOccurrences(of: "{\(index - 1)}", with: components[index])
+            }
+            return format
+        }
+        return map[symbol] ?? symbol
+    }
 
     func authenticate(username: String, password: String) async throws -> AuthenticationResponse {
         let clientIdentity: ClientIdentity = ClientIdentityStore.shared.loadOrCreateIdentity()
@@ -230,7 +302,7 @@ struct RemoteAuthenticationService: AuthenticationServicing {
                 let message = apiError.title,
                 !message.isEmpty
             {
-                throw AuthenticationError.serverError(message)
+                throw AuthenticationError.serverError(translate(symbol: message))
             }
             throw AuthenticationError.serverError(
                 "Server responded with status code \(httpResponse.statusCode).")
