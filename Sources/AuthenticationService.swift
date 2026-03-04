@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 struct UserInfoResponse: Decodable {
@@ -127,6 +128,7 @@ final class AuthSessionStore {
     private enum Keys {
         static let longLivedToken = "mynaswift.session.longLivedToken"
         static let keepLoginEnabled = "mynaswift.session.keepLoginEnabled"
+        static let encryptedSecurityKeyPrefix = "mynaswift.session.encryptedSecurityKey"
     }
 
     private let defaults = UserDefaults.standard
@@ -168,8 +170,67 @@ final class AuthSessionStore {
         return AuthSession(longLivedToken: token)
     }
 
+    func saveDataProtectionSecurityKey(
+        _ securityKey: String,
+        userID: Int64,
+        passwordManagerSalt: String
+    ) {
+        guard !securityKey.isEmpty,
+            !passwordManagerSalt.isEmpty
+        else {
+            clearDataProtectionSecurityKey(userID: userID)
+            return
+        }
+        do {
+            let symmetricKey = try deriveSymmetricKey(passwordManagerSalt: passwordManagerSalt)
+            let plaintext = Data(securityKey.utf8)
+            let sealed = try AES.GCM.seal(plaintext, using: symmetricKey)
+            guard let combined = sealed.combined else {
+                clearDataProtectionSecurityKey(userID: userID)
+                return
+            }
+            defaults.set(
+                combined.base64EncodedString(), forKey: encryptedSecurityStorageKey(userID: userID))
+        } catch {
+            clearDataProtectionSecurityKey(userID: userID)
+        }
+    }
+
+    func loadDataProtectionSecurityKey(userID: Int64, passwordManagerSalt: String) -> String? {
+        guard !passwordManagerSalt.isEmpty,
+            let encrypted = defaults.string(forKey: encryptedSecurityStorageKey(userID: userID)),
+            let encryptedData = Data(base64Encoded: encrypted)
+        else {
+            return nil
+        }
+        do {
+            let symmetricKey = try deriveSymmetricKey(passwordManagerSalt: passwordManagerSalt)
+            let sealedBox = try AES.GCM.SealedBox(combined: encryptedData)
+            let decryptedData = try AES.GCM.open(sealedBox, using: symmetricKey)
+            return String(data: decryptedData, encoding: .utf8)
+        } catch {
+            return nil
+        }
+    }
+
+    func clearDataProtectionSecurityKey(userID: Int64) {
+        defaults.removeObject(forKey: encryptedSecurityStorageKey(userID: userID))
+    }
+
     func clear() {
         defaults.removeObject(forKey: Keys.longLivedToken)
+    }
+
+    private func encryptedSecurityStorageKey(userID: Int64) -> String {
+        "\(Keys.encryptedSecurityKeyPrefix).\(userID)"
+    }
+
+    private func deriveSymmetricKey(passwordManagerSalt: String) throws -> SymmetricKey {
+        guard !passwordManagerSalt.isEmpty else {
+            throw AuthenticationError.serverError("Missing password manager salt.")
+        }
+        let hash = SHA256.hash(data: Data(passwordManagerSalt.utf8))
+        return SymmetricKey(data: Data(hash))
     }
 }
 

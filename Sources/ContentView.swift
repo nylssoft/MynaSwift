@@ -55,6 +55,8 @@ struct ContentView: View {
     @State private var isCheckingStoredSession = false
     @State private var pendingLongLivedTokenForPin: String?
     @State private var selectedSection: WorkspaceSection = .notes
+    @State private var showDataProtectionDialog = false
+    @State private var dataProtectionSecurityKey = ""
 
     private let authenticationService: AuthenticationServicing = RemoteAuthenticationService()
 
@@ -79,6 +81,20 @@ struct ContentView: View {
                 }
 
                 Spacer(minLength: 0)
+
+                Button {
+                    showDataProtectionDialog = true
+                } label: {
+                    Image(systemName: "lock.shield")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 32, height: 32)
+                        .foregroundStyle(isLoggedIn ? .primary : .secondary)
+                        .background(Color.primary.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Data Protection")
+                .disabled(!isLoggedIn)
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 10)
@@ -119,6 +135,7 @@ struct ContentView: View {
                     isLoggedIn = true
                     self.authentication = authentication
                     self.userInfo = userInfo
+                    restoreDataProtectionKeyFromSession(for: userInfo)
                 })
         }
         .sheet(isPresented: $showPinDialog) {
@@ -131,6 +148,14 @@ struct ContentView: View {
                     pendingLongLivedTokenForPin = nil
                     AuthSessionStore.shared.clear()
                     presentStartupLoginDialog()
+                })
+        }
+        .sheet(isPresented: $showDataProtectionDialog) {
+            DataProtectionDialogView(
+                isPresented: $showDataProtectionDialog,
+                initialSecurityKey: dataProtectionSecurityKey,
+                onSave: { securityKey in
+                    saveDataProtectionSecurityKey(securityKey)
                 })
         }
         .task {
@@ -176,6 +201,7 @@ struct ContentView: View {
             self.authentication = authentication
             self.userInfo = userInfo
             self.isLoggedIn = true
+            restoreDataProtectionKeyFromSession(for: userInfo)
             AuthSessionStore.shared.save(from: authentication)
         } catch {
             AuthSessionStore.shared.clear()
@@ -205,8 +231,35 @@ struct ContentView: View {
         self.authentication = authentication
         self.userInfo = userInfo
         self.isLoggedIn = true
+        restoreDataProtectionKeyFromSession(for: userInfo)
         pendingLongLivedTokenForPin = nil
         AuthSessionStore.shared.save(from: authentication)
+    }
+
+    private func restoreDataProtectionKeyFromSession(for userInfo: UserInfoResponse) {
+        if let restored = AuthSessionStore.shared.loadDataProtectionSecurityKey(
+            userID: userInfo.id,
+            passwordManagerSalt: userInfo.passwordManagerSalt)
+        {
+            dataProtectionSecurityKey = restored
+        } else {
+            dataProtectionSecurityKey = ""
+        }
+    }
+
+    private func saveDataProtectionSecurityKey(_ securityKey: String) {
+        guard isLoggedIn,
+            let userID = userInfo?.id,
+            let salt = userInfo?.passwordManagerSalt,
+            !salt.isEmpty
+        else {
+            return
+        }
+        dataProtectionSecurityKey = securityKey
+        AuthSessionStore.shared.saveDataProtectionSecurityKey(
+            dataProtectionSecurityKey,
+            userID: userID,
+            passwordManagerSalt: salt)
     }
 
     private var displayName: String {
@@ -218,7 +271,7 @@ struct ContentView: View {
 
     private var profileImageURL: URL? {
         guard let photo = userInfo?.photo,
-            !photo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            !photo.isEmpty
         else {
             return nil
         }
@@ -241,6 +294,10 @@ struct ContentView: View {
             return nil
         }
         return displayDateFormatter.string(from: date)
+    }
+
+    private var hasDataProtectionSecurityKey: Bool {
+        !dataProtectionSecurityKey.isEmpty
     }
 
     private var displayDateFormatter: DateFormatter {
@@ -325,11 +382,28 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Button {
+                    showDataProtectionDialog = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: hasDataProtectionSecurityKey ? "lock.fill" : "lock.open")
+                            .font(.caption)
+                        Text(
+                            hasDataProtectionSecurityKey
+                                ? "Data protection key: Set" : "Data protection key: Not set"
+                        )
+                        .font(.caption)
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+
                 Button("Log out") {
                     AuthSessionStore.shared.clear()
                     self.isLoggedIn = false
                     self.authentication = nil
                     self.userInfo = nil
+                    self.dataProtectionSecurityKey = ""
                 }
                 .font(.caption)
                 .buttonStyle(.link)
