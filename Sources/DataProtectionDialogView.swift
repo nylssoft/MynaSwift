@@ -6,6 +6,7 @@ struct DataProtectionDialogView: View {
     let onSave: (String) -> Void
 
     @State private var securityKey: String
+    @State private var isShowingSecurityKey = false
 
     init(
         isPresented: Binding<Bool>,
@@ -27,8 +28,25 @@ struct DataProtectionDialogView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            SecureField("Security key", text: $securityKey)
+            HStack(spacing: 8) {
+                Group {
+                    if isShowingSecurityKey {
+                        TextField("Security key", text: $securityKey)
+                    } else {
+                        SecureField("Security key", text: $securityKey)
+                    }
+                }
                 .textFieldStyle(.roundedBorder)
+
+                Button {
+                    isShowingSecurityKey.toggle()
+                } label: {
+                    Image(systemName: isShowingSecurityKey ? "eye.slash" : "eye")
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help(isShowingSecurityKey ? "Hide security key" : "Show security key")
+            }
 
             HStack {
                 Spacer()

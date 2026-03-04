@@ -85,6 +85,8 @@ protocol AuthenticationServicing {
     func initializeTranslations(locale: String) async throws
 
     func translate(symbol: String) -> String
+
+    func logout(token: String) async throws
 }
 
 struct ClientIdentity {
@@ -349,9 +351,17 @@ struct RemoteAuthenticationService: AuthenticationServicing {
         urlRequest.setValue(token, forHTTPHeaderField: "token")
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
         try checkResponse(response, data: data)
-        let responseBodyString = String(data: data, encoding: .utf8) ?? "<non-UTF8 response body>"
-        print(responseBodyString)
         return try JSONDecoder().decode(UserInfoResponse.self, from: data)
+    }
+
+    func logout(token: String) async throws {
+        var urlRequest = URLRequest(
+            url: URL(string: "/api/pwdman/logout", relativeTo: baseURL)!)
+        urlRequest.httpMethod = "GET"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue(token, forHTTPHeaderField: "token")
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        try checkResponse(response, data: data)
     }
 
     private func checkResponse(_ response: URLResponse, data: Data) throws {

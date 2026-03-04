@@ -57,6 +57,7 @@ struct ContentView: View {
     @State private var selectedSection: WorkspaceSection = .notes
     @State private var showDataProtectionDialog = false
     @State private var dataProtectionSecurityKey = ""
+    @State private var isLoggingOut = false
 
     private let authenticationService: AuthenticationServicing = RemoteAuthenticationService()
 
@@ -262,6 +263,26 @@ struct ContentView: View {
             passwordManagerSalt: salt)
     }
 
+    @MainActor
+    private func logoutCurrentUser() async {
+        guard !isLoggingOut else {
+            return
+        }
+        isLoggingOut = true
+        defer { isLoggingOut = false }
+        if let token = authentication?.token, !token.isEmpty {
+            do {
+                try await authenticationService.logout(token: token)
+            } catch {
+            }
+        }
+        AuthSessionStore.shared.clear()
+        self.isLoggedIn = false
+        self.authentication = nil
+        self.userInfo = nil
+        self.dataProtectionSecurityKey = ""
+    }
+
     private var displayName: String {
         guard let name = userInfo?.name, !name.isEmpty else {
             return "Logged in"
@@ -399,14 +420,13 @@ struct ContentView: View {
                 .buttonStyle(.plain)
 
                 Button("Log out") {
-                    AuthSessionStore.shared.clear()
-                    self.isLoggedIn = false
-                    self.authentication = nil
-                    self.userInfo = nil
-                    self.dataProtectionSecurityKey = ""
+                    Task {
+                        await logoutCurrentUser()
+                    }
                 }
                 .font(.caption)
                 .buttonStyle(.link)
+                .disabled(isLoggingOut)
             }
         }
     }
