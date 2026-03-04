@@ -1,27 +1,34 @@
 import SwiftUI
 
 struct AboutDialogView: View {
+    private let appVersion = "0.2.0"
+
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("MynaSwift")
                 .font(.title)
 
-            Text("Version 0.1.0")
+            Text("Version \(appVersion)")
                 .foregroundStyle(.secondary)
 
-            Text("This is a skeleton About dialog for a macOS desktop app.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
+            Text(
+                "MynaSwift is a personal workspace for managing notes, documents, passwords, contacts, appointments, and diary entries in one secure desktop application.\n\nThe goal of the application is to keep personal information organized while protecting workspace content with a user-defined security key."
+            )
+            .lineLimit(nil)
+            .fixedSize(horizontal: false, vertical: true)
+            .foregroundStyle(.secondary)
 
             Spacer(minLength: 6)
 
-            Button("Close") {
-                NSApplication.shared.keyWindow?.close()
+            HStack {
+                Spacer()
+                Button("Close") {
+                    NSApplication.shared.keyWindow?.close()
+                }
+                .keyboardShortcut(.cancelAction)
             }
-            .keyboardShortcut(.cancelAction)
         }
         .padding(20)
-        .frame(minWidth: 380, minHeight: 220)
+        .frame(minWidth: 420, minHeight: 240)
     }
 }
