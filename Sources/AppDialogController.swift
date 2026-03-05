@@ -12,7 +12,7 @@ final class AppDialogController {
         let window = NSWindow(contentViewController: host)
         window.title = L10n.s("about.window.title")
         window.styleMask = [.titled, .closable]
-        window.setContentSize(NSSize(width: 420, height: 260))
+        window.setContentSize(NSSize(width: 560, height: 340))
         window.center()
         window.isReleasedWhenClosed = false
 

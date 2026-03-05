@@ -85,48 +85,53 @@ struct ContentView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            VStack(spacing: 8) {
-                ForEach(WorkspaceSection.allCases) { section in
+            if isLoggedIn {
+                VStack(spacing: 8) {
+                    ForEach(WorkspaceSection.allCases) { section in
+                        Button {
+                            selectedSection = section
+                        } label: {
+                            Image(systemName: section.iconName)
+                                .font(.system(size: 16, weight: .semibold))
+                                .frame(width: 32, height: 32)
+                                .foregroundStyle(selectedSection == section ? .primary : .secondary)
+                                .background(
+                                    selectedSection == section
+                                        ? Color.primary.opacity(0.12) : .clear
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .help(section.title)
+                    }
+
+                    Spacer(minLength: 0)
+
                     Button {
-                        selectedSection = section
+                        showDataProtectionDialog = true
                     } label: {
-                        Image(systemName: section.iconName)
+                        Image(systemName: "lock.shield")
                             .font(.system(size: 16, weight: .semibold))
                             .frame(width: 32, height: 32)
-                            .foregroundStyle(selectedSection == section ? .primary : .secondary)
-                            .background(
-                                selectedSection == section ? Color.primary.opacity(0.12) : .clear
-                            )
+                            .foregroundStyle(.primary)
+                            .background(Color.primary.opacity(0.12))
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .help(section.title)
+                    .help(L10n.s("dataProtection.title"))
                 }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 10)
+                .frame(
+                    minWidth: 56,
+                    idealWidth: 56,
+                    maxWidth: 56,
+                    maxHeight: .infinity,
+                    alignment: .top)
+                .background(.quaternary.opacity(0.35))
 
-                Spacer(minLength: 0)
-
-                Button {
-                    showDataProtectionDialog = true
-                } label: {
-                    Image(systemName: "lock.shield")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 32, height: 32)
-                        .foregroundStyle(isLoggedIn ? .primary : .secondary)
-                        .background(Color.primary.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .help(L10n.s("dataProtection.title"))
-                .disabled(!isLoggedIn)
+                Divider()
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 10)
-            .frame(
-                minWidth: 56, idealWidth: 56, maxWidth: 56, maxHeight: .infinity, alignment: .top
-            )
-            .background(.quaternary.opacity(0.35))
-
-            Divider()
 
             GeometryReader { proxy in
                 ScrollView(.vertical) {
@@ -185,11 +190,15 @@ struct ContentView: View {
                             }
                         }
 
-                        Divider()
+                        if isLoggedIn {
+                            Divider()
 
-                        sectionSkeletonView
-                            .frame(
-                                maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            sectionSkeletonView
+                                .frame(
+                                    maxWidth: .infinity,
+                                    maxHeight: .infinity,
+                                    alignment: .topLeading)
+                        }
                     }
                     .padding(24)
                     .frame(minHeight: proxy.size.height, alignment: .topLeading)

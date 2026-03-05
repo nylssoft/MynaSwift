@@ -27,6 +27,6 @@ struct AboutDialogView: View {
             }
         }
         .padding(20)
-        .frame(minWidth: 420, minHeight: 240)
+        .frame(minWidth: 560, minHeight: 320)
     }
 }
