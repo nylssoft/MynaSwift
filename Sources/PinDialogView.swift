@@ -16,10 +16,10 @@ struct PinDialogView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("PIN Required")
+            Text(L10n.s("pin.title"))
                 .font(.title2)
 
-            SecureField("PIN", text: $pin)
+            SecureField(L10n.s("pin.placeholder"), text: $pin)
                 .textFieldStyle(.roundedBorder)
                 .focused($focusedField, equals: .pin)
 
@@ -32,13 +32,13 @@ struct PinDialogView: View {
             HStack {
                 Spacer()
 
-                Button("Cancel") {
+                Button(L10n.s("common.cancel")) {
                     onCancel?()
                     isPresented = false
                 }
                 .disabled(isSubmitting)
 
-                Button("Continue") {
+                Button(L10n.s("common.continue")) {
                     Task {
                         await submit()
                     }
@@ -50,7 +50,7 @@ struct PinDialogView: View {
             .padding(.top, 8)
 
             if isSubmitting {
-                ProgressView("Verifying PIN...")
+                ProgressView(L10n.s("pin.progress.verifying"))
                     .controlSize(.small)
             }
         }
@@ -74,7 +74,7 @@ struct PinDialogView: View {
             if let authenticationError = error as? ServiceError {
                 errorMessage = authenticationError.errorDescription
             } else {
-                errorMessage = "Unexpected PIN authentication error."
+                errorMessage = L10n.s("error.pin.unexpected")
             }
         }
         isSubmitting = false

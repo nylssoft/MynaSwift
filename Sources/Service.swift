@@ -67,21 +67,21 @@ enum ServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .emptyCredentials:
-            return "Username and password are required."
+            return L10n.s("service.error.emptyCredentials")
         case .twoFactorCodeRequired:
-            return "Second factor code is required."
+            return L10n.s("service.error.twoFactorCodeRequired")
         case .twoFactorTokenMissing:
-            return "Second factor token is missing."
+            return L10n.s("service.error.twoFactorTokenMissing")
         case .invalidURL:
-            return "The authentication URL is invalid."
+            return L10n.s("service.error.invalidURL")
         case .networkError:
-            return "Authentication request failed. Please check your network connection."
+            return L10n.s("service.error.network")
         case .invalidCredentials:
-            return "Invalid credentials."
+            return L10n.s("service.error.invalidCredentials")
         case .serverError(let message):
             return message
         case .decodingError:
-            return "Could not parse the authentication response."
+            return L10n.s("service.error.decoding")
         }
     }
 }
@@ -275,7 +275,7 @@ final class AuthSessionStore {
 
     private func deriveSymmetricKey(passwordManagerSalt: String) throws -> SymmetricKey {
         guard !passwordManagerSalt.isEmpty else {
-            throw ServiceError.serverError("Missing password manager salt.")
+            throw ServiceError.serverError(L10n.s("service.error.missingPasswordManagerSalt"))
         }
         let hash = SHA256.hash(data: Data(passwordManagerSalt.utf8))
         return SymmetricKey(data: Data(hash))
@@ -461,7 +461,7 @@ struct RemoteService: Servicing {
         passwordManagerSalt: String
     ) async throws -> [ContactItem] {
         guard !encryptionKey.isEmpty else {
-            throw ServiceError.serverError("No data protection key configured.")
+            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
         }
         let encrypted = try await loadEncodedContacts(token: token)
         guard !encrypted.isEmpty else {
@@ -482,7 +482,7 @@ struct RemoteService: Servicing {
         passwordManagerSalt: String
     ) async throws {
         guard !encryptionKey.isEmpty else {
-            throw ServiceError.serverError("No data protection key configured.")
+            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
         }
         let sortedItems = contactItems.sorted { $0.id < $1.id }
         let nextId = (sortedItems.map(\.id).max() ?? 0) + 1
@@ -500,7 +500,7 @@ struct RemoteService: Servicing {
     private func deriveCryptoKey(encryptionKey: String, passwordManagerSalt: String) throws -> Data
     {
         guard !encryptionKey.isEmpty, !passwordManagerSalt.isEmpty else {
-            throw ServiceError.serverError("Missing encryption key configuration.")
+            throw ServiceError.serverError(L10n.s("service.error.missingEncryptionKeyConfig"))
         }
         let keyLength = kCCKeySizeAES256
         var derivedKey = Data(repeating: 0, count: keyLength)
@@ -522,7 +522,7 @@ struct RemoteService: Servicing {
             }
         }
         guard status == kCCSuccess else {
-            throw ServiceError.serverError("Could not derive encryption key.")
+            throw ServiceError.serverError(L10n.s("service.error.deriveEncryptionKey"))
         }
         return derivedKey
     }
@@ -531,7 +531,7 @@ struct RemoteService: Servicing {
         let symmetricKey = SymmetricKey(data: key)
         let sealedBox = try AES.GCM.seal(plainData, using: symmetricKey)
         guard let combined = sealedBox.combined else {
-            throw ServiceError.serverError("Could not encrypt contact data.")
+            throw ServiceError.serverError(L10n.s("service.error.encryptContacts"))
         }
         return combined
     }
@@ -542,7 +542,7 @@ struct RemoteService: Servicing {
             let sealedBox = try AES.GCM.SealedBox(combined: encryptedData)
             return try AES.GCM.open(sealedBox, using: symmetricKey)
         } catch {
-            throw ServiceError.serverError("Invalid data protection key.")
+            throw ServiceError.serverError(L10n.s("service.error.invalidDataProtectionKey"))
         }
     }
 
@@ -558,7 +558,9 @@ struct RemoteService: Servicing {
                 throw ServiceError.serverError(translate(symbol: message))
             }
             throw ServiceError.serverError(
-                "Server responded with status code \(httpResponse.statusCode).")
+                String(
+                    format: L10n.s("service.error.serverStatusCode.format"),
+                    httpResponse.statusCode))
         }
     }
 }

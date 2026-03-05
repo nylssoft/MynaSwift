@@ -36,13 +36,17 @@ struct LoggedInUserDetailsView: View {
                 }
 
                 if let lastLoginText {
-                    Text("Last login: \(lastLoginText)")
+                    Text(
+                        String(format: L10n.s("user.lastLogin.format"), lastLoginText)
+                    )
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
                 if let registeredText {
-                    Text("Registered: \(registeredText)")
+                    Text(
+                        String(format: L10n.s("user.registered.format"), registeredText)
+                    )
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -53,7 +57,8 @@ struct LoggedInUserDetailsView: View {
                             .font(.caption)
                         Text(
                             hasDataProtectionSecurityKey
-                                ? "Data protection key: Set" : "Data protection key: Not set"
+                                ? L10n.s("user.dataProtectionKey.set")
+                                : L10n.s("user.dataProtectionKey.notSet")
                         )
                         .font(.caption)
                     }
@@ -61,7 +66,7 @@ struct LoggedInUserDetailsView: View {
                 }
                 .buttonStyle(.plain)
 
-                Button("Log out", action: onLogoutTap)
+                Button(L10n.s("user.logout"), action: onLogoutTap)
                     .font(.caption)
                     .buttonStyle(.link)
                     .disabled(isLoggingOut)

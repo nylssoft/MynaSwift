@@ -23,27 +23,27 @@ struct LoginDialogView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Login")
+            Text(L10n.s("login.title"))
                 .font(.title2)
 
-            TextField("Username", text: $username)
+            TextField(L10n.s("login.username"), text: $username)
                 .textFieldStyle(.roundedBorder)
                 .disabled(isAwaitingSecondFactor)
                 .focused($focusedField, equals: .username)
 
-            SecureField("Password", text: $password)
+            SecureField(L10n.s("login.password"), text: $password)
                 .textFieldStyle(.roundedBorder)
                 .disabled(isAwaitingSecondFactor)
                 .focused($focusedField, equals: .password)
 
-            Toggle("Keep me signed in", isOn: $keepLogin)
+            Toggle(L10n.s("login.keepSignedIn"), isOn: $keepLogin)
                 .disabled(isAuthenticating)
                 .onChange(of: keepLogin) { _, newValue in
                     AuthSessionStore.shared.setKeepLoginEnabled(newValue)
                 }
 
             if isAwaitingSecondFactor {
-                TextField("Second factor code", text: $secondFactorCode)
+                TextField(L10n.s("login.secondFactorCode"), text: $secondFactorCode)
                     .textFieldStyle(.roundedBorder)
                     .focused($focusedField, equals: .secondFactor)
                     .onAppear {
@@ -62,13 +62,13 @@ struct LoginDialogView: View {
             HStack {
                 Spacer()
 
-                Button("Cancel") {
+                Button(L10n.s("common.cancel")) {
                     isPresented = false
                 }
                 .disabled(isAuthenticating)
 
                 if isAwaitingSecondFactor {
-                    Button("Complete 2FA") {
+                    Button(L10n.s("login.complete2fa")) {
                         Task {
                             await completeSecondFactor()
                         }
@@ -80,7 +80,7 @@ struct LoginDialogView: View {
                                 .isEmpty
                     )
                 } else {
-                    Button("Sign In") {
+                    Button(L10n.s("login.signIn")) {
                         Task {
                             await signIn()
                         }
@@ -95,7 +95,10 @@ struct LoginDialogView: View {
             .padding(.top, 8)
 
             if isAuthenticating {
-                ProgressView(isAwaitingSecondFactor ? "Completing 2FA..." : "Signing in...")
+                ProgressView(
+                    isAwaitingSecondFactor
+                        ? L10n.s("login.progress.completing2fa")
+                        : L10n.s("login.progress.signingIn"))
                     .controlSize(.small)
             }
         }
@@ -141,7 +144,7 @@ struct LoginDialogView: View {
             if let authenticationError = error as? ServiceError {
                 errorMessage = authenticationError.errorDescription
             } else {
-                errorMessage = "Unexpected authentication error."
+                errorMessage = L10n.s("error.authentication.unexpected")
             }
         }
         isAuthenticating = false
@@ -150,7 +153,7 @@ struct LoginDialogView: View {
     @MainActor
     private func completeSecondFactor() async {
         guard let pendingSecondFactorToken else {
-            errorMessage = "No pending authentication request."
+            errorMessage = L10n.s("error.authentication.noPendingRequest")
             return
         }
         isAuthenticating = true
@@ -168,7 +171,7 @@ struct LoginDialogView: View {
             if let authenticationError = error as? ServiceError {
                 errorMessage = authenticationError.errorDescription
             } else {
-                errorMessage = "Unexpected authentication error."
+                errorMessage = L10n.s("error.authentication.unexpected")
             }
         }
         isAuthenticating = false

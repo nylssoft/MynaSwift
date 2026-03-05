@@ -15,17 +15,17 @@ struct ContentView: View {
         var title: String {
             switch self {
             case .notes:
-                return "Notes"
+                return L10n.s("section.notes")
             case .documents:
-                return "Documents"
+                return L10n.s("section.documents")
             case .passwords:
-                return "Passwords"
+                return L10n.s("section.passwords")
             case .contacts:
-                return "Contacts"
+                return L10n.s("section.contacts")
             case .appointments:
-                return "Appointments"
+                return L10n.s("section.appointments")
             case .diaryEntries:
-                return "Diary Entries"
+                return L10n.s("section.diaryEntries")
             }
         }
 
@@ -60,6 +60,9 @@ struct ContentView: View {
     @State private var dataProtectionSecurityKey = ""
     @State private var isLoggingOut = false
     @AppStorage("contentView.isUserDetailsCollapsed") private var isUserDetailsCollapsed = false
+#if DEBUG
+    @AppStorage("debug.locale.override") private var debugLocaleOverride = "system"
+#endif
 
     private let service: Servicing = RemoteService()
 
@@ -70,6 +73,14 @@ struct ContentView: View {
         nonmutating set {
             selectedSectionRawValue = newValue.rawValue
         }
+    }
+
+    private var translationTaskID: String {
+#if DEBUG
+        return debugLocaleOverride
+#else
+        return Locale.preferredLanguages.first ?? "system"
+#endif
     }
 
     var body: some View {
@@ -105,7 +116,7 @@ struct ContentView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .help("Data Protection")
+                .help(L10n.s("dataProtection.title"))
                 .disabled(!isLoggedIn)
             }
             .padding(.vertical, 12)
@@ -125,7 +136,7 @@ struct ContentView: View {
                         if isLoggedIn {
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack(spacing: 10) {
-                                    Text("User Details")
+                                    Text(L10n.s("user.details"))
                                         .font(.headline)
 
                                     Spacer()
@@ -140,7 +151,8 @@ struct ContentView: View {
                                     .buttonStyle(.plain)
                                     .help(
                                         isUserDetailsCollapsed
-                                            ? "Expand user details" : "Collapse user details")
+                                            ? L10n.s("user.details.expand")
+                                            : L10n.s("user.details.collapse"))
                                 }
 
                                 if !isUserDetailsCollapsed {
@@ -163,12 +175,12 @@ struct ContentView: View {
                                 }
                             }
                         } else if isCheckingStoredSession {
-                            ProgressView("Validating saved session...")
+                            ProgressView(L10n.s("session.validating"))
                                 .controlSize(.small)
                         }
 
                         if !isLoggedIn {
-                            Button("Login") {
+                            Button(L10n.s("login.title")) {
                                 showLoginDialog = true
                             }
                         }
@@ -219,8 +231,10 @@ struct ContentView: View {
                     saveDataProtectionSecurityKey(securityKey)
                 })
         }
-        .task {
+        .task(id: translationTaskID) {
             await initializeTranslationsOnStartup()
+        }
+        .task {
             await authenticateStoredSessionOnStartup()
         }
     }
@@ -228,7 +242,8 @@ struct ContentView: View {
     @MainActor
     private func initializeTranslationsOnStartup() async {
         do {
-            try await service.initializeTranslations(locale: "en")
+            let supportedLocale = L10n.supportedLanguageCode()
+            try await service.initializeTranslations(locale: supportedLocale)
         } catch {
         }
     }
@@ -286,7 +301,7 @@ struct ContentView: View {
         guard let token = authentication.token
         else {
             throw ServiceError.serverError(
-                "PIN authentication did not return an access token.")
+                L10n.s("error.pin.noAccessToken"))
         }
         let userInfo = try await service.getUserInfo(token: token)
         self.authentication = authentication
@@ -345,7 +360,7 @@ struct ContentView: View {
 
     private var displayName: String {
         guard let name = userInfo?.name, !name.isEmpty else {
-            return "Logged in"
+            return L10n.s("user.loggedIn")
         }
         return name
     }
@@ -402,11 +417,17 @@ struct ContentView: View {
     private var sectionSkeletonView: some View {
         switch selectedSection {
         case .notes:
-            SectionSkeletonView(title: "Notes", subtitle: "Manage all notes")
+            SectionSkeletonView(
+                title: L10n.s("section.notes"),
+                subtitle: L10n.s("section.notes.subtitle"))
         case .documents:
-            SectionSkeletonView(title: "Documents", subtitle: "Manage all documents")
+            SectionSkeletonView(
+                title: L10n.s("section.documents"),
+                subtitle: L10n.s("section.documents.subtitle"))
         case .passwords:
-            SectionSkeletonView(title: "Passwords", subtitle: "Manage all passwords")
+            SectionSkeletonView(
+                title: L10n.s("section.passwords"),
+                subtitle: L10n.s("section.passwords.subtitle"))
         case .contacts:
             ContactsView(
                 service: service,
@@ -415,19 +436,21 @@ struct ContentView: View {
                 dataProtectionSecurityKey: dataProtectionSecurityKey,
                 isLoggedIn: isLoggedIn)
         case .appointments:
-            SectionSkeletonView(title: "Appointments", subtitle: "Manage all appointments")
+            SectionSkeletonView(
+                title: L10n.s("section.appointments"),
+                subtitle: L10n.s("section.appointments.subtitle"))
         case .diaryEntries:
-            SectionSkeletonView(title: "Diary Entries", subtitle: "Manage all diary entries")
+            SectionSkeletonView(
+                title: L10n.s("section.diaryEntries"),
+                subtitle: L10n.s("section.diaryEntries.subtitle"))
         }
     }
 
     private var headerView: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Personal Workspace")
+            Text(L10n.s("workspace.title"))
                 .font(.largeTitle)
-            Text(
-                "Organize your notes, documents, passwords, contacts, appointments, and diary entries in one place."
-            )
+            Text(L10n.s("workspace.subtitle"))
             .foregroundStyle(.secondary)
         }
     }

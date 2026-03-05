@@ -1,0 +1,104 @@
+"app.name" = "MynaSwift";
+"menu.about" = "About MynaSwift";
+"about.window.title" = "About MynaSwift";
+"about.version.format" = "Version %@";
+"about.description" = "MynaSwift is a personal workspace for managing notes, documents, passwords, contacts, appointments, and diary entries in one secure desktop application.\n\nThe goal of the application is to keep personal information organized while protecting workspace content with a user-defined security key.";
+
+"common.close" = "Close";
+"common.cancel" = "Cancel";
+"common.save" = "Save";
+"common.continue" = "Continue";
+"common.delete" = "Delete";
+"common.notSet" = "Not set";
+
+"workspace.title" = "Personal Workspace";
+"workspace.subtitle" = "Organize your notes, documents, passwords, contacts, appointments, and diary entries in one place.";
+"session.validating" = "Validating saved session...";
+
+"section.notes" = "Notes";
+"section.documents" = "Documents";
+"section.passwords" = "Passwords";
+"section.contacts" = "Contacts";
+"section.appointments" = "Appointments";
+"section.diaryEntries" = "Diary Entries";
+"section.notes.subtitle" = "Manage all notes";
+"section.documents.subtitle" = "Manage all documents";
+"section.passwords.subtitle" = "Manage all passwords";
+"section.appointments.subtitle" = "Manage all appointments";
+"section.diaryEntries.subtitle" = "Manage all diary entries";
+
+"user.details" = "User Details";
+"user.details.expand" = "Expand user details";
+"user.details.collapse" = "Collapse user details";
+"user.lastLogin.format" = "Last login: %@";
+"user.registered.format" = "Registered: %@";
+"user.dataProtectionKey.set" = "Data protection key: Set";
+"user.dataProtectionKey.notSet" = "Data protection key: Not set";
+"user.logout" = "Log out";
+"user.loggedIn" = "Logged in";
+
+"dataProtection.title" = "Data Protection";
+"dataProtection.description" = "Enter the security key used to encrypt and decrypt personal workspace data.";
+"dataProtection.securityKey" = "Security key";
+"dataProtection.hideSecurityKey" = "Hide security key";
+"dataProtection.showSecurityKey" = "Show security key";
+
+"login.title" = "Login";
+"login.username" = "Username";
+"login.password" = "Password";
+"login.keepSignedIn" = "Keep me signed in";
+"login.secondFactorCode" = "Second factor code";
+"login.complete2fa" = "Complete 2FA";
+"login.signIn" = "Sign In";
+"login.progress.completing2fa" = "Completing 2FA...";
+"login.progress.signingIn" = "Signing in...";
+
+"pin.title" = "PIN Required";
+"pin.placeholder" = "PIN";
+"pin.progress.verifying" = "Verifying PIN...";
+
+"contacts.reload" = "Reload contacts";
+"contacts.add" = "Add contact";
+"contacts.uploading" = "Uploading contacts...";
+"contacts.loading" = "Loading contacts...";
+"contacts.empty" = "No contacts available.";
+"contacts.noName" = "(No name)";
+"contacts.thisContact" = "this contact";
+"contacts.delete" = "Delete contact";
+"contacts.delete.title" = "Delete Contact?";
+"contacts.delete.message.format" = "Do you want to delete %@?";
+"contacts.selectPrompt" = "Select a contact to view details.";
+"contacts.contact" = "Contact";
+"contacts.help.saveChanges" = "Save changes";
+"contacts.help.edit" = "Edit contact";
+"contacts.field.name" = "Name";
+"contacts.field.birthday" = "Birthday";
+"contacts.field.phone" = "Phone";
+"contacts.field.email" = "Email";
+"contacts.field.address" = "Address";
+"contacts.field.note" = "Note";
+"contacts.error.setKey.load" = "Set your data protection key to load contacts.";
+"contacts.error.setKey.upload" = "Set your data protection key to upload contacts.";
+"contacts.error.setKey.create" = "Set your data protection key to create contacts.";
+"contacts.error.load" = "Failed to load contacts.";
+"contacts.error.upload" = "Failed to upload contacts.";
+
+"error.authentication.unexpected" = "Unexpected authentication error.";
+"error.authentication.noPendingRequest" = "No pending authentication request.";
+"error.pin.unexpected" = "Unexpected PIN authentication error.";
+"error.pin.noAccessToken" = "PIN authentication did not return an access token.";
+
+"service.error.emptyCredentials" = "Username and password are required.";
+"service.error.twoFactorCodeRequired" = "Second factor code is required.";
+"service.error.twoFactorTokenMissing" = "Second factor token is missing.";
+"service.error.invalidURL" = "The authentication URL is invalid.";
+"service.error.network" = "Authentication request failed. Please check your network connection.";
+"service.error.invalidCredentials" = "Invalid credentials.";
+"service.error.decoding" = "Could not parse the authentication response.";
+"service.error.missingPasswordManagerSalt" = "Missing password manager salt.";
+"service.error.noDataProtectionKey" = "No data protection key configured.";
+"service.error.missingEncryptionKeyConfig" = "Missing encryption key configuration.";
+"service.error.deriveEncryptionKey" = "Could not derive encryption key.";
+"service.error.encryptContacts" = "Could not encrypt contact data.";
+"service.error.invalidDataProtectionKey" = "Invalid data protection key.";
+"service.error.serverStatusCode.format" = "Server responded with status code %d.";

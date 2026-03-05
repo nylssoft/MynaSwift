@@ -1,0 +1,104 @@
+"app.name" = "MynaSwift";
+"menu.about" = "Über MynaSwift";
+"about.window.title" = "Über MynaSwift";
+"about.version.format" = "Version %@";
+"about.description" = "MynaSwift ist ein persönlicher Arbeitsbereich zum Verwalten von Notizen, Dokumenten, Passwörtern, Kontakten, Terminen und Tagebucheinträgen in einer sicheren Desktop-Anwendung.\n\nDas Ziel der Anwendung ist es, persönliche Informationen übersichtlich zu halten und gleichzeitig die Inhalte des Arbeitsbereichs mit einem benutzerdefinierten Sicherheitsschlüssel zu schützen.";
+
+"common.close" = "Schließen";
+"common.cancel" = "Abbrechen";
+"common.save" = "Speichern";
+"common.continue" = "Weiter";
+"common.delete" = "Löschen";
+"common.notSet" = "Nicht gesetzt";
+
+"workspace.title" = "Persönlicher Arbeitsbereich";
+"workspace.subtitle" = "Organisieren Sie Ihre Notizen, Dokumente, Passwörter, Kontakte, Termine und Tagebucheinträge an einem Ort.";
+"session.validating" = "Gespeicherte Sitzung wird überprüft...";
+
+"section.notes" = "Notizen";
+"section.documents" = "Dokumente";
+"section.passwords" = "Passwörter";
+"section.contacts" = "Kontakte";
+"section.appointments" = "Termine";
+"section.diaryEntries" = "Tagebucheinträge";
+"section.notes.subtitle" = "Alle Notizen verwalten";
+"section.documents.subtitle" = "Alle Dokumente verwalten";
+"section.passwords.subtitle" = "Alle Passwörter verwalten";
+"section.appointments.subtitle" = "Alle Termine verwalten";
+"section.diaryEntries.subtitle" = "Alle Tagebucheinträge verwalten";
+
+"user.details" = "Benutzerdetails";
+"user.details.expand" = "Benutzerdetails ausklappen";
+"user.details.collapse" = "Benutzerdetails einklappen";
+"user.lastLogin.format" = "Letzte Anmeldung: %@";
+"user.registered.format" = "Registriert: %@";
+"user.dataProtectionKey.set" = "Datenschutzschlüssel: gesetzt";
+"user.dataProtectionKey.notSet" = "Datenschutzschlüssel: nicht gesetzt";
+"user.logout" = "Abmelden";
+"user.loggedIn" = "Angemeldet";
+
+"dataProtection.title" = "Datenschutz";
+"dataProtection.description" = "Geben Sie den Sicherheitsschlüssel ein, der zum Ver- und Entschlüsseln persönlicher Arbeitsbereichsdaten verwendet wird.";
+"dataProtection.securityKey" = "Sicherheitsschlüssel";
+"dataProtection.hideSecurityKey" = "Sicherheitsschlüssel ausblenden";
+"dataProtection.showSecurityKey" = "Sicherheitsschlüssel anzeigen";
+
+"login.title" = "Anmeldung";
+"login.username" = "Benutzername";
+"login.password" = "Passwort";
+"login.keepSignedIn" = "Angemeldet bleiben";
+"login.secondFactorCode" = "Zweiter Faktor Code";
+"login.complete2fa" = "2FA abschließen";
+"login.signIn" = "Anmelden";
+"login.progress.completing2fa" = "2FA wird abgeschlossen...";
+"login.progress.signingIn" = "Anmeldung läuft...";
+
+"pin.title" = "PIN erforderlich";
+"pin.placeholder" = "PIN";
+"pin.progress.verifying" = "PIN wird überprüft...";
+
+"contacts.reload" = "Kontakte neu laden";
+"contacts.add" = "Kontakt hinzufügen";
+"contacts.uploading" = "Kontakte werden hochgeladen...";
+"contacts.loading" = "Kontakte werden geladen...";
+"contacts.empty" = "Keine Kontakte verfügbar.";
+"contacts.noName" = "(Kein Name)";
+"contacts.thisContact" = "diesen Kontakt";
+"contacts.delete" = "Kontakt löschen";
+"contacts.delete.title" = "Kontakt löschen?";
+"contacts.delete.message.format" = "Möchten Sie %@ löschen?";
+"contacts.selectPrompt" = "Wählen Sie einen Kontakt aus, um Details anzuzeigen.";
+"contacts.contact" = "Kontakt";
+"contacts.help.saveChanges" = "Änderungen speichern";
+"contacts.help.edit" = "Kontakt bearbeiten";
+"contacts.field.name" = "Name";
+"contacts.field.birthday" = "Geburtstag";
+"contacts.field.phone" = "Telefon";
+"contacts.field.email" = "E-Mail";
+"contacts.field.address" = "Adresse";
+"contacts.field.note" = "Notiz";
+"contacts.error.setKey.load" = "Setzen Sie Ihren Datenschutzschlüssel, um Kontakte zu laden.";
+"contacts.error.setKey.upload" = "Setzen Sie Ihren Datenschutzschlüssel, um Kontakte hochzuladen.";
+"contacts.error.setKey.create" = "Setzen Sie Ihren Datenschutzschlüssel, um Kontakte zu erstellen.";
+"contacts.error.load" = "Kontakte konnten nicht geladen werden.";
+"contacts.error.upload" = "Kontakte konnten nicht hochgeladen werden.";
+
+"error.authentication.unexpected" = "Unerwarteter Authentifizierungsfehler.";
+"error.authentication.noPendingRequest" = "Keine ausstehende Authentifizierungsanfrage.";
+"error.pin.unexpected" = "Unerwarteter PIN-Authentifizierungsfehler.";
+"error.pin.noAccessToken" = "PIN-Authentifizierung hat kein Zugriffstoken zurückgegeben.";
+
+"service.error.emptyCredentials" = "Benutzername und Passwort sind erforderlich.";
+"service.error.twoFactorCodeRequired" = "Der Code des zweiten Faktors ist erforderlich.";
+"service.error.twoFactorTokenMissing" = "Das Token für den zweiten Faktor fehlt.";
+"service.error.invalidURL" = "Die Authentifizierungs-URL ist ungültig.";
+"service.error.network" = "Authentifizierungsanfrage fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkverbindung.";
+"service.error.invalidCredentials" = "Ungültige Anmeldedaten.";
+"service.error.decoding" = "Die Authentifizierungsantwort konnte nicht verarbeitet werden.";
+"service.error.missingPasswordManagerSalt" = "Password-Manager-Salt fehlt.";
+"service.error.noDataProtectionKey" = "Kein Datenschutzschlüssel konfiguriert.";
+"service.error.missingEncryptionKeyConfig" = "Verschlüsselungsschlüssel-Konfiguration fehlt.";
+"service.error.deriveEncryptionKey" = "Verschlüsselungsschlüssel konnte nicht abgeleitet werden.";
+"service.error.encryptContacts" = "Kontaktdaten konnten nicht verschlüsselt werden.";
+"service.error.invalidDataProtectionKey" = "Ungültiger Datenschutzschlüssel.";
+"service.error.serverStatusCode.format" = "Server antwortete mit Statuscode %d.";

@@ -21,19 +21,19 @@ struct DataProtectionDialogView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Data Protection")
+            Text(L10n.s("dataProtection.title"))
                 .font(.title2)
 
-            Text("Enter the security key used to encrypt and decrypt personal workspace data.")
+            Text(L10n.s("dataProtection.description"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
                 Group {
                     if isShowingSecurityKey {
-                        TextField("Security key", text: $securityKey)
+                        TextField(L10n.s("dataProtection.securityKey"), text: $securityKey)
                     } else {
-                        SecureField("Security key", text: $securityKey)
+                        SecureField(L10n.s("dataProtection.securityKey"), text: $securityKey)
                     }
                 }
                 .textFieldStyle(.roundedBorder)
@@ -45,17 +45,20 @@ struct DataProtectionDialogView: View {
                         .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
-                .help(isShowingSecurityKey ? "Hide security key" : "Show security key")
+                .help(
+                    isShowingSecurityKey
+                        ? L10n.s("dataProtection.hideSecurityKey")
+                        : L10n.s("dataProtection.showSecurityKey"))
             }
 
             HStack {
                 Spacer()
 
-                Button("Cancel") {
+                Button(L10n.s("common.cancel")) {
                     isPresented = false
                 }
 
-                Button("Save") {
+                Button(L10n.s("common.save")) {
                     onSave(securityKey)
                     isPresented = false
                 }

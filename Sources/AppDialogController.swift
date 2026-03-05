@@ -10,7 +10,7 @@ final class AppDialogController {
         let host = NSHostingController(rootView: view)
 
         let window = NSWindow(contentViewController: host)
-        window.title = "About MynaSwift"
+        window.title = L10n.s("about.window.title")
         window.styleMask = [.titled, .closable]
         window.setContentSize(NSSize(width: 420, height: 260))
         window.center()

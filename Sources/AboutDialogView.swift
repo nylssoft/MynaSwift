@@ -5,15 +5,13 @@ struct AboutDialogView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("MynaSwift")
+            Text(L10n.s("app.name"))
                 .font(.title)
 
-            Text("Version \(appVersion)")
+            Text(String(format: L10n.s("about.version.format"), appVersion))
                 .foregroundStyle(.secondary)
 
-            Text(
-                "MynaSwift is a personal workspace for managing notes, documents, passwords, contacts, appointments, and diary entries in one secure desktop application.\n\nThe goal of the application is to keep personal information organized while protecting workspace content with a user-defined security key."
-            )
+            Text(L10n.s("about.description"))
             .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
             .foregroundStyle(.secondary)
@@ -22,7 +20,7 @@ struct AboutDialogView: View {
 
             HStack {
                 Spacer()
-                Button("Close") {
+                Button(L10n.s("common.close")) {
                     NSApplication.shared.keyWindow?.close()
                 }
                 .keyboardShortcut(.cancelAction)

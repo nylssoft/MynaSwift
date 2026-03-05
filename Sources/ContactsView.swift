@@ -64,16 +64,18 @@ struct ContactsView: View {
 
     private var selectedContactDisplayName: String {
         guard let selectedContact else {
-            return "this contact"
+            return L10n.s("contacts.thisContact")
         }
-        return selectedContact.name.isEmpty ? "this contact" : "\"\(selectedContact.name)\""
+        return selectedContact.name.isEmpty
+            ? L10n.s("contacts.thisContact")
+            : selectedContact.name
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("Contacts")
+                    Text(L10n.s("section.contacts"))
                         .font(.title2)
                         .fontWeight(.semibold)
 
@@ -87,7 +89,7 @@ struct ContactsView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                     .buttonStyle(.plain)
-                    .help("Reload contacts")
+                    .help(L10n.s("contacts.reload"))
                     .disabled(isBusy || !isLoggedIn)
 
                     Button {
@@ -98,13 +100,15 @@ struct ContactsView: View {
                         Image(systemName: "plus")
                     }
                     .buttonStyle(.plain)
-                    .help("Add contact")
+                    .help(L10n.s("contacts.add"))
                     .disabled(isBusy || !canSyncContacts)
                 }
 
                 if isBusy {
                     ProgressView(
-                        isUploadingContacts ? "Uploading contacts..." : "Loading contacts..."
+                        isUploadingContacts
+                            ? L10n.s("contacts.uploading")
+                            : L10n.s("contacts.loading")
                     )
                     .controlSize(.small)
                 }
@@ -116,7 +120,7 @@ struct ContactsView: View {
                 }
 
                 if contactItems.isEmpty {
-                    Text("No contacts available.")
+                    Text(L10n.s("contacts.empty"))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(.top, 2)
@@ -126,7 +130,9 @@ struct ContactsView: View {
                             selectContact(item)
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(item.name.isEmpty ? "(No name)" : item.name)
+                                Text(
+                                    item.name.isEmpty
+                                        ? L10n.s("contacts.noName") : item.name)
                                     .font(.headline)
                                 if !item.email.isEmpty || !item.phone.isEmpty
                                     || !item.birthday.isEmpty
@@ -181,15 +187,18 @@ struct ContactsView: View {
                     showDeleteConfirmation = true
                 })
         }
-        .alert("Delete Contact?", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
+        .alert(L10n.s("contacts.delete.title"), isPresented: $showDeleteConfirmation) {
+            Button(L10n.s("common.cancel"), role: .cancel) {}
+            Button(L10n.s("common.delete"), role: .destructive) {
                 Task {
                     await deleteSelectedContact()
                 }
             }
         } message: {
-            Text("Do you want to delete \(selectedContactDisplayName)?")
+            Text(
+                String(
+                    format: L10n.s("contacts.delete.message.format"),
+                    selectedContactDisplayName))
         }
         .task(id: syncContextID) {
             hasLoadedContacts = false
@@ -210,7 +219,7 @@ struct ContactsView: View {
             let token,
             let passwordManagerSalt
         else {
-            contactsErrorMessage = "Set your data protection key to load contacts."
+            contactsErrorMessage = L10n.s("contacts.error.setKey.load")
             contactItems = []
             hasLoadedContacts = false
             clearContactSelection()
@@ -231,7 +240,8 @@ struct ContactsView: View {
             updateSelectionAfterReload(preferredSelectedID: preferredSelectedID)
         } catch {
             contactsErrorMessage =
-                (error as? LocalizedError)?.errorDescription ?? "Failed to load contacts."
+                (error as? LocalizedError)?.errorDescription
+                ?? L10n.s("contacts.error.load")
             contactItems = []
             hasLoadedContacts = false
             clearContactSelection()
@@ -247,7 +257,7 @@ struct ContactsView: View {
             let token,
             let passwordManagerSalt
         else {
-            contactsErrorMessage = "Set your data protection key to upload contacts."
+            contactsErrorMessage = L10n.s("contacts.error.setKey.upload")
             return
         }
 
@@ -263,14 +273,15 @@ struct ContactsView: View {
                 passwordManagerSalt: passwordManagerSalt)
         } catch {
             contactsErrorMessage =
-                (error as? LocalizedError)?.errorDescription ?? "Failed to upload contacts."
+                (error as? LocalizedError)?.errorDescription
+                ?? L10n.s("contacts.error.upload")
         }
     }
 
     @MainActor
     private func createContact() async {
         guard canSyncContacts else {
-            contactsErrorMessage = "Set your data protection key to create contacts."
+            contactsErrorMessage = L10n.s("contacts.error.setKey.create")
             return
         }
         let nextID = (contactItems.map(\.id).max() ?? 0) + 1
@@ -423,29 +434,36 @@ private struct ContactDetailView: View {
                     Image(systemName: isEditing ? "checkmark" : "square.and.pencil")
                 }
                 .buttonStyle(.plain)
-                .help(isEditing ? "Save changes" : "Edit contact")
+                .help(
+                    isEditing
+                        ? L10n.s("contacts.help.saveChanges")
+                        : L10n.s("contacts.help.edit"))
                 .disabled(contact == nil || isBusy)
 
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.plain)
-                .help("Delete contact")
+                .help(L10n.s("contacts.delete"))
                 .disabled(contact == nil || isBusy)
             }
 
             if contact == nil {
-                Text("Select a contact to view details.")
+                Text(L10n.s("contacts.selectPrompt"))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             } else {
                 Group {
-                    editableRow(label: "Name", text: $nameDraft)
-                    editableRow(label: "Birthday", text: $birthdayDraft)
-                    editableRow(label: "Phone", text: $phoneDraft)
-                    editableRow(label: "Email", text: $emailDraft)
-                    editableRow(label: "Address", text: $addressDraft)
-                    editableNoteRow(label: "Note", text: $noteDraft)
+                    editableRow(label: L10n.s("contacts.field.name"), text: $nameDraft)
+                    editableRow(
+                        label: L10n.s("contacts.field.birthday"),
+                        text: $birthdayDraft)
+                    editableRow(label: L10n.s("contacts.field.phone"), text: $phoneDraft)
+                    editableRow(label: L10n.s("contacts.field.email"), text: $emailDraft)
+                    editableRow(
+                        label: L10n.s("contacts.field.address"),
+                        text: $addressDraft)
+                    editableNoteRow(label: L10n.s("contacts.field.note"), text: $noteDraft)
                 }
                 Spacer(minLength: 0)
             }
@@ -455,9 +473,9 @@ private struct ContactDetailView: View {
 
     private var contactTitle: String {
         guard let contact else {
-            return "Contact"
+            return L10n.s("contacts.contact")
         }
-        return contact.name.isEmpty ? "(No name)" : contact.name
+        return contact.name.isEmpty ? L10n.s("contacts.noName") : contact.name
     }
 
     @ViewBuilder
@@ -507,6 +525,6 @@ private struct ContactDetailView: View {
     }
 
     private func readOnlyText(_ value: String) -> String {
-        value.isEmpty ? "Not set" : value
+        value.isEmpty ? L10n.s("common.notSet") : value
     }
 }
