@@ -54,27 +54,26 @@ struct ContentView: View {
     @State private var authentication: AuthenticationResponse?
     @State private var isCheckingStoredSession = false
     @State private var pendingLongLivedTokenForPin: String?
-    @State private var selectedSection: WorkspaceSection = .notes
+    @AppStorage("contentView.selectedSection") private var selectedSectionRawValue =
+        WorkspaceSection.notes.rawValue
     @State private var showDataProtectionDialog = false
     @State private var dataProtectionSecurityKey = ""
     @State private var isLoggingOut = false
-    @State private var contactItems: [ContactItem] = []
-    @State private var isLoadingContacts = false
-    @State private var isUploadingContacts = false
-    @State private var contactsErrorMessage: String?
-    @State private var hasLoadedContacts = false
-    @State private var selectedContactID: Int64?
-    @State private var contactNameDraft = ""
-    @State private var contactBirthdayDraft = ""
-    @State private var contactPhoneDraft = ""
-    @State private var contactAddressDraft = ""
-    @State private var contactEmailDraft = ""
-    @State private var contactNoteDraft = ""
+    @AppStorage("contentView.isUserDetailsCollapsed") private var isUserDetailsCollapsed = false
 
     private let service: Servicing = RemoteService()
 
+    private var selectedSection: WorkspaceSection {
+        get {
+            WorkspaceSection(rawValue: selectedSectionRawValue) ?? .notes
+        }
+        nonmutating set {
+            selectedSectionRawValue = newValue.rawValue
+        }
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(alignment: .top, spacing: 0) {
             VStack(spacing: 8) {
                 ForEach(WorkspaceSection.allCases) { section in
                     Button {
@@ -111,35 +110,84 @@ struct ContentView: View {
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 10)
-            .frame(width: 56)
+            .frame(
+                minWidth: 56, idealWidth: 56, maxWidth: 56, maxHeight: .infinity, alignment: .top
+            )
             .background(.quaternary.opacity(0.35))
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 16) {
-                headerView
+            GeometryReader { proxy in
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        headerView
 
-                if isLoggedIn {
-                    userDetailsView
-                } else if isCheckingStoredSession {
-                    ProgressView("Validating saved session...")
-                        .controlSize(.small)
-                }
+                        if isLoggedIn {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 10) {
+                                    Text("User Details")
+                                        .font(.headline)
 
-                HStack(spacing: 10) {
-                    Button(isLoggedIn ? "Switch User" : "Login") {
-                        showLoginDialog = true
+                                    Spacer()
+
+                                    Button {
+                                        isUserDetailsCollapsed.toggle()
+                                    } label: {
+                                        Image(
+                                            systemName: isUserDetailsCollapsed
+                                                ? "chevron.down.circle" : "chevron.up.circle")
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help(
+                                        isUserDetailsCollapsed
+                                            ? "Expand user details" : "Collapse user details")
+                                }
+
+                                if !isUserDetailsCollapsed {
+                                    LoggedInUserDetailsView(
+                                        displayName: displayName,
+                                        email: userInfo?.email,
+                                        profileImageURL: profileImageURL,
+                                        lastLoginText: lastLoginText,
+                                        registeredText: registeredText,
+                                        hasDataProtectionSecurityKey: hasDataProtectionSecurityKey,
+                                        isLoggingOut: isLoggingOut,
+                                        onDataProtectionTap: {
+                                            showDataProtectionDialog = true
+                                        },
+                                        onLogoutTap: {
+                                            Task {
+                                                await logoutCurrentUser()
+                                            }
+                                        })
+                                }
+                            }
+                        } else if isCheckingStoredSession {
+                            ProgressView("Validating saved session...")
+                                .controlSize(.small)
+                        }
+
+                        if !isLoggedIn {
+                            Button("Login") {
+                                showLoginDialog = true
+                            }
+                        }
+
+                        Divider()
+
+                        sectionSkeletonView
+                            .frame(
+                                maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     }
+                    .padding(24)
+                    .frame(minHeight: proxy.size.height, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-
-                Divider()
-
-                sectionSkeletonView
-
-                Spacer(minLength: 0)
+                .scrollIndicators(.automatic)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .padding(24)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .frame(minWidth: 700, minHeight: 420)
         .sheet(isPresented: $showLoginDialog) {
             LoginDialogView(
@@ -174,12 +222,6 @@ struct ContentView: View {
         .task {
             await initializeTranslationsOnStartup()
             await authenticateStoredSessionOnStartup()
-        }
-        .task(id: selectedSection) {
-            guard selectedSection == .contacts else {
-                return
-            }
-            await loadContactItemsIfNeeded(force: false)
         }
     }
 
@@ -299,141 +341,6 @@ struct ContentView: View {
         self.authentication = nil
         self.userInfo = nil
         self.dataProtectionSecurityKey = ""
-        self.contactItems = []
-        self.contactsErrorMessage = nil
-        self.hasLoadedContacts = false
-        clearContactSelection()
-    }
-
-    @MainActor
-    private func loadContactItemsIfNeeded(force: Bool) async {
-        if isLoadingContacts {
-            return
-        }
-        if hasLoadedContacts && !force {
-            return
-        }
-        guard let token = authentication?.token,
-            !token.isEmpty,
-            let salt = userInfo?.passwordManagerSalt,
-            !salt.isEmpty,
-            !dataProtectionSecurityKey.isEmpty
-        else {
-            contactsErrorMessage = "Set your data protection key to load contacts."
-            contactItems = []
-            hasLoadedContacts = false
-            return
-        }
-
-        isLoadingContacts = true
-        contactsErrorMessage = nil
-        defer { isLoadingContacts = false }
-
-        do {
-            let items = try await service.getContactItems(
-                token: token,
-                encryptionKey: dataProtectionSecurityKey,
-                passwordManagerSalt: salt)
-            contactItems = items
-            hasLoadedContacts = true
-            clearContactSelection()
-        } catch {
-            contactsErrorMessage =
-                (error as? LocalizedError)?.errorDescription ?? "Failed to load contacts."
-            contactItems = []
-            hasLoadedContacts = false
-            clearContactSelection()
-        }
-    }
-
-    @MainActor
-    private func uploadContactItems() async {
-        if isUploadingContacts {
-            return
-        }
-        guard let token = authentication?.token,
-            !token.isEmpty,
-            let salt = userInfo?.passwordManagerSalt,
-            !salt.isEmpty,
-            !dataProtectionSecurityKey.isEmpty
-        else {
-            contactsErrorMessage = "Set your data protection key to upload contacts."
-            return
-        }
-
-        isUploadingContacts = true
-        contactsErrorMessage = nil
-        defer { isUploadingContacts = false }
-
-        do {
-            try await service.uploadContactItems(
-                token: token,
-                contactItems: contactItems,
-                encryptionKey: dataProtectionSecurityKey,
-                passwordManagerSalt: salt)
-        } catch {
-            contactsErrorMessage =
-                (error as? LocalizedError)?.errorDescription ?? "Failed to upload contacts."
-        }
-    }
-
-    private func clearContactSelection() {
-        selectedContactID = nil
-        contactNameDraft = ""
-        contactBirthdayDraft = ""
-        contactPhoneDraft = ""
-        contactAddressDraft = ""
-        contactEmailDraft = ""
-        contactNoteDraft = ""
-    }
-
-    private func selectContact(_ item: ContactItem) {
-        selectedContactID = item.id
-        contactNameDraft = item.name
-        contactBirthdayDraft = item.birthday
-        contactPhoneDraft = item.phone
-        contactAddressDraft = item.address
-        contactEmailDraft = item.email
-        contactNoteDraft = item.note
-    }
-
-    private func createContact() {
-        let nextID = (contactItems.map(\.id).max() ?? 0) + 1
-        let newContact = ContactItem(
-            id: nextID,
-            name: "",
-            birthday: "",
-            phone: "",
-            address: "",
-            email: "",
-            note: "")
-        contactItems.append(newContact)
-        contactItems.sort { $0.id < $1.id }
-        selectContact(newContact)
-    }
-
-    private func saveSelectedContactChanges() {
-        guard let selectedContactID,
-            let index = contactItems.firstIndex(where: { $0.id == selectedContactID })
-        else {
-            return
-        }
-        contactItems[index].name = contactNameDraft
-        contactItems[index].birthday = contactBirthdayDraft
-        contactItems[index].phone = contactPhoneDraft
-        contactItems[index].address = contactAddressDraft
-        contactItems[index].email = contactEmailDraft
-        contactItems[index].note = contactNoteDraft
-        contactsErrorMessage = nil
-    }
-
-    private func deleteSelectedContact() {
-        guard let selectedContactID else {
-            return
-        }
-        contactItems.removeAll { $0.id == selectedContactID }
-        clearContactSelection()
-        contactsErrorMessage = nil
     }
 
     private var displayName: String {
@@ -501,125 +408,16 @@ struct ContentView: View {
         case .passwords:
             SectionSkeletonView(title: "Passwords", subtitle: "Manage all passwords")
         case .contacts:
-            contactsSectionView
+            ContactsView(
+                service: service,
+                authentication: authentication,
+                userInfo: userInfo,
+                dataProtectionSecurityKey: dataProtectionSecurityKey,
+                isLoggedIn: isLoggedIn)
         case .appointments:
             SectionSkeletonView(title: "Appointments", subtitle: "Manage all appointments")
         case .diaryEntries:
             SectionSkeletonView(title: "Diary Entries", subtitle: "Manage all diary entries")
-        }
-    }
-
-    private var contactsSectionView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Contacts")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    Text("Manage encrypted contact items")
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Button("Reload") {
-                    Task {
-                        await loadContactItemsIfNeeded(force: true)
-                    }
-                }
-                .disabled(isLoadingContacts || !isLoggedIn)
-
-                Button("Upload") {
-                    Task {
-                        await uploadContactItems()
-                    }
-                }
-                .disabled(isUploadingContacts || isLoadingContacts || !isLoggedIn)
-            }
-
-            if isLoadingContacts || isUploadingContacts {
-                ProgressView(isUploadingContacts ? "Uploading contacts..." : "Loading contacts...")
-                    .controlSize(.small)
-            }
-
-            if let contactsErrorMessage {
-                Text(contactsErrorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-            }
-
-            if contactItems.isEmpty {
-                Text("No contacts available.")
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 4)
-            } else {
-                List(contactItems) { item in
-                    Button {
-                        selectContact(item)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.name.isEmpty ? "(No name)" : item.name)
-                                .font(.headline)
-                            if !item.email.isEmpty {
-                                Text(item.email)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else if !item.phone.isEmpty {
-                                Text(item.phone)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 2)
-                    }
-                    .buttonStyle(.plain)
-                    .listRowBackground(
-                        selectedContactID == item.id ? Color.primary.opacity(0.12) : Color.clear
-                    )
-                }
-                .frame(minHeight: 170)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 10) {
-                    Button("New") {
-                        createContact()
-                    }
-                    .disabled(!isLoggedIn || isLoadingContacts || isUploadingContacts)
-
-                    Button("Save Changes") {
-                        saveSelectedContactChanges()
-                    }
-                    .disabled(selectedContactID == nil || isLoadingContacts || isUploadingContacts)
-
-                    Button("Delete") {
-                        deleteSelectedContact()
-                    }
-                    .disabled(selectedContactID == nil || isLoadingContacts || isUploadingContacts)
-                }
-
-                TextField("Name", text: $contactNameDraft)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(selectedContactID == nil)
-                HStack(spacing: 10) {
-                    TextField("Birthday", text: $contactBirthdayDraft)
-                        .textFieldStyle(.roundedBorder)
-                        .disabled(selectedContactID == nil)
-                    TextField("Phone", text: $contactPhoneDraft)
-                        .textFieldStyle(.roundedBorder)
-                        .disabled(selectedContactID == nil)
-                }
-                TextField("Email", text: $contactEmailDraft)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(selectedContactID == nil)
-                TextField("Address", text: $contactAddressDraft)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(selectedContactID == nil)
-                TextField("Note", text: $contactNoteDraft)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(selectedContactID == nil)
-            }
         }
     }
 
@@ -634,69 +432,6 @@ struct ContentView: View {
         }
     }
 
-    private var userDetailsView: some View {
-        HStack(alignment: .top, spacing: 12) {
-            if let profileImageURL = profileImageURL {
-                AsyncImage(url: profileImageURL) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } placeholder: {
-                    ProgressView()
-                }
-                .frame(width: 64, height: 64)
-                .clipShape(Circle())
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(displayName)
-                    .font(.headline)
-
-                if let email = userInfo?.email, !email.isEmpty {
-                    Text(email)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let lastLoginText {
-                    Text("Last login: \(lastLoginText)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let registeredText {
-                    Text("Registered: \(registeredText)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Button {
-                    showDataProtectionDialog = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: hasDataProtectionSecurityKey ? "lock.fill" : "lock.open")
-                            .font(.caption)
-                        Text(
-                            hasDataProtectionSecurityKey
-                                ? "Data protection key: Set" : "Data protection key: Not set"
-                        )
-                        .font(.caption)
-                    }
-                    .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-
-                Button("Log out") {
-                    Task {
-                        await logoutCurrentUser()
-                    }
-                }
-                .font(.caption)
-                .buttonStyle(.link)
-                .disabled(isLoggingOut)
-            }
-        }
-    }
 }
 
 private struct SectionSkeletonView: View {
