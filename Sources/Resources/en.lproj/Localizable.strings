@@ -83,6 +83,35 @@
 "contacts.error.load" = "Failed to load contacts.";
 "contacts.error.upload" = "Failed to upload contacts.";
 
+"notes.reload" = "Reload notes";
+"notes.add" = "Add note";
+"notes.loading" = "Loading notes...";
+"notes.loadingDetails" = "Loading note details...";
+"notes.creating" = "Creating note...";
+"notes.saving" = "Saving note...";
+"notes.deleting" = "Deleting note...";
+"notes.empty" = "No notes available.";
+"notes.noTitle" = "(No title)";
+"notes.thisNote" = "this note";
+"notes.note" = "Note";
+"notes.delete" = "Delete note";
+"notes.delete.title" = "Delete Note?";
+"notes.delete.message.format" = "Do you want to delete %@?";
+"notes.selectPrompt" = "Select a note to view details.";
+"notes.help.saveChanges" = "Save changes";
+"notes.help.edit" = "Edit note";
+"notes.field.title" = "Title";
+"notes.field.content" = "Content";
+"notes.lastModified.format" = "Last modified: %@";
+"notes.error.loginRequired" = "Sign in to manage notes.";
+"notes.error.setKey" = "Set your data protection key to manage notes.";
+"notes.error.load" = "Failed to load notes.";
+"notes.error.details" = "Failed to load note details.";
+"notes.error.create" = "Failed to create note.";
+"notes.error.save" = "Failed to save note.";
+"notes.error.delete" = "Failed to delete note.";
+"notes.newTitle" = "New Note";
+
 "error.authentication.unexpected" = "Unexpected authentication error.";
 "error.authentication.noPendingRequest" = "No pending authentication request.";
 "error.pin.unexpected" = "Unexpected PIN authentication error.";

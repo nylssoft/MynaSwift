@@ -454,7 +454,9 @@ private struct ContactDetailView: View {
                 Spacer(minLength: 0)
             } else {
                 Group {
-                    editableRow(label: L10n.s("contacts.field.name"), text: $nameDraft)
+                    if isEditing {
+                        editableRow(label: L10n.s("contacts.field.name"), text: $nameDraft)
+                    }
                     editableRow(
                         label: L10n.s("contacts.field.birthday"),
                         text: $birthdayDraft)

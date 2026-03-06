@@ -54,6 +54,13 @@ struct ContactItem: Codable, Identifiable {
     var note: String
 }
 
+struct Note: Codable, Identifiable {
+    let id: Int64
+    var title: String
+    var content: String?
+    var lastModifiedUtc: String?
+}
+
 enum ServiceError: LocalizedError {
     case emptyCredentials
     case invalidCredentials
@@ -102,6 +109,28 @@ protocol Servicing {
     func completePin(longLivedToken: String, pin: String) async throws -> AuthenticationResponse
 
     func logout(token: String) async throws
+
+    // notes
+
+    func getNotes(token: String, encryptionKey: String, passwordManagerSalt: String) async throws
+        -> [Note]
+
+    func getNote(token: String, id: Int64, encryptionKey: String, passwordManagerSalt: String)
+        async throws -> Note
+
+    func createNewNote(token: String, title: String, encryptionKey: String, passwordManagerSalt: String)
+        async throws -> Int64
+
+    func deleteNote(token: String, id: Int64) async throws
+
+    func updateNote(
+        token: String,
+        id: Int64,
+        title: String,
+        content: String,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> String
 
     // contacts
 
@@ -410,6 +439,110 @@ struct RemoteService: Servicing {
         try checkResponse(response, data: data)
     }
 
+    func getNotes(token: String, encryptionKey: String, passwordManagerSalt: String) async throws
+        -> [Note]
+    {
+        guard !encryptionKey.isEmpty else {
+            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
+        }
+        var request = URLRequest(url: URL(string: "/api/notes/note", relativeTo: baseURL)!)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        debugLogResponse(endpoint: "/api/notes/note", data: data)
+        let encryptedNotes = try decodeNotes(from: data)
+        return try encryptedNotes.map { note in
+            try decodeNoteFields(
+                note,
+                encryptionKey: encryptionKey,
+                passwordManagerSalt: passwordManagerSalt,
+                includeContent: false)
+        }
+    }
+
+    func getNote(token: String, id: Int64, encryptionKey: String, passwordManagerSalt: String)
+        async throws -> Note
+    {
+        guard !encryptionKey.isEmpty else {
+            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
+        }
+        var request = URLRequest(url: URL(string: "/api/notes/note/\(id)", relativeTo: baseURL)!)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        debugLogResponse(endpoint: "/api/notes/note/\(id)", data: data)
+        let encryptedNote = try decodeNote(from: data)
+        return try decodeNoteFields(
+            encryptedNote,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt,
+            includeContent: true)
+    }
+
+    func createNewNote(token: String, title: String, encryptionKey: String, passwordManagerSalt: String)
+        async throws -> Int64
+    {
+        guard !encryptionKey.isEmpty else {
+            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
+        }
+        let encryptedTitle = try encodeContactText(
+            text: title,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+        var request = URLRequest(url: URL(string: "/api/notes/note", relativeTo: baseURL)!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.httpBody = try JSONEncoder().encode(CreateNoteRequest(title: encryptedTitle))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        return try JSONDecoder().decode(Int64.self, from: data)
+    }
+
+    func deleteNote(token: String, id: Int64) async throws {
+        var request = URLRequest(url: URL(string: "/api/notes/note/\(id)", relativeTo: baseURL)!)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+    }
+
+    func updateNote(
+        token: String,
+        id: Int64,
+        title: String,
+        content: String,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> String {
+        guard !encryptionKey.isEmpty else {
+            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
+        }
+        let encryptedTitle = try encodeContactText(
+            text: title,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+        let encryptedContent = try encodeContactText(
+            text: content,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+        var request = URLRequest(url: URL(string: "/api/notes/note", relativeTo: baseURL)!)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.httpBody = try JSONEncoder().encode(
+            UpdateNoteRequest(id: id, title: encryptedTitle, content: encryptedContent))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        debugLogResponse(endpoint: "/api/notes/note [PUT]", data: data)
+        return try JSONDecoder().decode(String.self, from: data)
+    }
+
     func loadEncodedContacts(token: String) async throws -> String {
         var request = URLRequest(url: URL(string: "/api/contacts", relativeTo: baseURL)!)
         request.httpMethod = "GET"
@@ -527,6 +660,38 @@ struct RemoteService: Servicing {
         return derivedKey
     }
 
+    private func decodeNotes(from data: Data) throws -> [Note] {
+        try JSONDecoder().decode([Note].self, from: data)
+    }
+
+    private func decodeNote(from data: Data) throws -> Note {
+        try JSONDecoder().decode(Note.self, from: data)
+    }
+
+    private func decodeNoteFields(
+        _ note: Note,
+        encryptionKey: String,
+        passwordManagerSalt: String,
+        includeContent: Bool
+    ) throws -> Note {
+        var decoded = note
+        decoded.title = try decodeContactText(
+            encrypted: note.title,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+        if includeContent {
+            if let encryptedContent = note.content {
+                decoded.content = try decodeContactText(
+                    encrypted: encryptedContent,
+                    encryptionKey: encryptionKey,
+                    passwordManagerSalt: passwordManagerSalt)
+            } else {
+                decoded.content = nil
+            }
+        }
+        return decoded
+    }
+
     private func encryptData(_ plainData: Data, key: Data) throws -> Data {
         let symmetricKey = SymmetricKey(data: key)
         let sealedBox = try AES.GCM.seal(plainData, using: symmetricKey)
@@ -563,6 +728,13 @@ struct RemoteService: Servicing {
                     httpResponse.statusCode))
         }
     }
+
+    private func debugLogResponse(endpoint: String, data: Data) {
+#if DEBUG
+        let body = String(data: data, encoding: .utf8) ?? "<non-utf8-response>"
+        print("[RemoteService] Response \(endpoint): \(body)")
+#endif
+    }
 }
 
 private struct AuthenticationRequest: Encodable {
@@ -576,6 +748,26 @@ private struct AuthenticationRequest: Encodable {
         case password = "Password"
         case clientUUID = "ClientUUID"
         case clientName = "ClientName"
+    }
+}
+
+private struct CreateNoteRequest: Encodable {
+    let title: String
+
+    enum CodingKeys: String, CodingKey {
+        case title = "Title"
+    }
+}
+
+private struct UpdateNoteRequest: Encodable {
+    let id: Int64
+    let title: String
+    let content: String
+
+    enum CodingKeys: String, CodingKey {
+        case id = "Id"
+        case title = "Title"
+        case content = "Content"
     }
 }
 

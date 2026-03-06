@@ -426,9 +426,12 @@ struct ContentView: View {
     private var sectionSkeletonView: some View {
         switch selectedSection {
         case .notes:
-            SectionSkeletonView(
-                title: L10n.s("section.notes"),
-                subtitle: L10n.s("section.notes.subtitle"))
+            NotesView(
+                service: service,
+                authentication: authentication,
+                passwordManagerSalt: userInfo?.passwordManagerSalt,
+                dataProtectionSecurityKey: dataProtectionSecurityKey,
+                isLoggedIn: isLoggedIn)
         case .documents:
             SectionSkeletonView(
                 title: L10n.s("section.documents"),

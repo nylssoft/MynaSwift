@@ -83,6 +83,35 @@
 "contacts.error.load" = "Kontakte konnten nicht geladen werden.";
 "contacts.error.upload" = "Kontakte konnten nicht hochgeladen werden.";
 
+"notes.reload" = "Notizen neu laden";
+"notes.add" = "Notiz hinzufügen";
+"notes.loading" = "Notizen werden geladen...";
+"notes.loadingDetails" = "Notizdetails werden geladen...";
+"notes.creating" = "Notiz wird erstellt...";
+"notes.saving" = "Notiz wird gespeichert...";
+"notes.deleting" = "Notiz wird gelöscht...";
+"notes.empty" = "Keine Notizen verfügbar.";
+"notes.noTitle" = "(Kein Titel)";
+"notes.thisNote" = "diese Notiz";
+"notes.note" = "Notiz";
+"notes.delete" = "Notiz löschen";
+"notes.delete.title" = "Notiz löschen?";
+"notes.delete.message.format" = "Möchten Sie %@ löschen?";
+"notes.selectPrompt" = "Wählen Sie eine Notiz aus, um Details anzuzeigen.";
+"notes.help.saveChanges" = "Änderungen speichern";
+"notes.help.edit" = "Notiz bearbeiten";
+"notes.field.title" = "Titel";
+"notes.field.content" = "Inhalt";
+"notes.lastModified.format" = "Zuletzt geändert: %@";
+"notes.error.loginRequired" = "Melden Sie sich an, um Notizen zu verwalten.";
+"notes.error.setKey" = "Setzen Sie Ihren Datenschutzschlüssel, um Notizen zu verwalten.";
+"notes.error.load" = "Notizen konnten nicht geladen werden.";
+"notes.error.details" = "Notizdetails konnten nicht geladen werden.";
+"notes.error.create" = "Notiz konnte nicht erstellt werden.";
+"notes.error.save" = "Notiz konnte nicht gespeichert werden.";
+"notes.error.delete" = "Notiz konnte nicht gelöscht werden.";
+"notes.newTitle" = "Neue Notiz";
+
 "error.authentication.unexpected" = "Unerwarteter Authentifizierungsfehler.";
 "error.authentication.noPendingRequest" = "Keine ausstehende Authentifizierungsanfrage.";
 "error.pin.unexpected" = "Unerwarteter PIN-Authentifizierungsfehler.";
