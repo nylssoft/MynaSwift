@@ -12,14 +12,17 @@ This implementation is still work in progress. Existing features are usable, but
 - User details panel with logout and data protection key management.
 - Notes management: list, detail, create, edit, delete.
 - Contacts management: load, edit, create, delete, and upload.
-- Encryption/decryption for protected contact and note fields.
+- Password manager: load, create, edit, delete, upload, per-item password encode/decode, URL open action, and favicon display.
+- Diary: calendar month navigation, load days with entries, load/edit/save/delete encrypted diary entries.
+- Encryption/decryption for protected notes, contacts, password data, and diary entries.
+- Application status bar for asynchronous activity and action feedback (for example copy/save/delete messages).
 - Localization support for English and German.
 - Fallback behavior to English for missing/unsupported localization.
-- About dialog integration via app menu.
+- About dialog integration via app menu, including version and copyright notice.
 
 ## Not fully implemented yet
 
-- Some workspace sections are placeholders or skeleton views (for example documents, passwords, appointments, and diary entries).
+- Some workspace sections are placeholders or skeleton views (for example documents and appointments).
 - UI and service behavior are still being refined.
 
 ## Run the app
