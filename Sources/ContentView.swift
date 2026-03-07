@@ -59,6 +59,8 @@ struct ContentView: View {
     @State private var showDataProtectionDialog = false
     @State private var dataProtectionSecurityKey = ""
     @State private var isLoggingOut = false
+    @State private var statusBarMessage: String?
+    @State private var clearStatusBarTask: Task<Void, Never>?
     @AppStorage("contentView.isUserDetailsCollapsed") private var isUserDetailsCollapsed = false
     #if DEBUG
         @AppStorage("debug.locale.override") private var debugLocaleOverride = "system"
@@ -134,79 +136,96 @@ struct ContentView: View {
                 Divider()
             }
 
-            GeometryReader { proxy in
-                ScrollView(.vertical) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        headerView
+            VStack(spacing: 0) {
+                GeometryReader { proxy in
+                    ScrollView(.vertical) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            headerView
 
-                        if isLoggedIn {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack(spacing: 10) {
-                                    Text(L10n.s("user.details"))
-                                        .font(.headline)
+                            if isLoggedIn {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 10) {
+                                        Text(L10n.s("user.details"))
+                                            .font(.headline)
 
-                                    Spacer()
+                                        Spacer()
 
-                                    Button {
-                                        isUserDetailsCollapsed.toggle()
-                                    } label: {
-                                        Image(
-                                            systemName: isUserDetailsCollapsed
-                                                ? "chevron.down.circle" : "chevron.up.circle")
+                                        Button {
+                                            isUserDetailsCollapsed.toggle()
+                                        } label: {
+                                            Image(
+                                                systemName: isUserDetailsCollapsed
+                                                    ? "chevron.down.circle" : "chevron.up.circle")
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help(
+                                            isUserDetailsCollapsed
+                                                ? L10n.s("user.details.expand")
+                                                : L10n.s("user.details.collapse"))
                                     }
-                                    .buttonStyle(.plain)
-                                    .help(
-                                        isUserDetailsCollapsed
-                                            ? L10n.s("user.details.expand")
-                                            : L10n.s("user.details.collapse"))
-                                }
 
-                                if !isUserDetailsCollapsed {
-                                    LoggedInUserDetailsView(
-                                        displayName: displayName,
-                                        email: userInfo?.email,
-                                        profileImageURL: profileImageURL,
-                                        lastLoginText: lastLoginText,
-                                        registeredText: registeredText,
-                                        hasDataProtectionSecurityKey: hasDataProtectionSecurityKey,
-                                        isLoggingOut: isLoggingOut,
-                                        onDataProtectionTap: {
-                                            showDataProtectionDialog = true
-                                        },
-                                        onLogoutTap: {
-                                            Task {
-                                                await logoutCurrentUser()
-                                            }
-                                        })
+                                    if !isUserDetailsCollapsed {
+                                        LoggedInUserDetailsView(
+                                            displayName: displayName,
+                                            email: userInfo?.email,
+                                            profileImageURL: profileImageURL,
+                                            lastLoginText: lastLoginText,
+                                            registeredText: registeredText,
+                                            hasDataProtectionSecurityKey: hasDataProtectionSecurityKey,
+                                            isLoggingOut: isLoggingOut,
+                                            onDataProtectionTap: {
+                                                showDataProtectionDialog = true
+                                            },
+                                            onLogoutTap: {
+                                                Task {
+                                                    await logoutCurrentUser()
+                                                }
+                                            })
+                                    }
+                                }
+                            } else if isCheckingStoredSession {
+                                ProgressView(L10n.s("session.validating"))
+                                    .controlSize(.small)
+                            }
+
+                            if !isLoggedIn {
+                                Button(L10n.s("login.title")) {
+                                    showLoginDialog = true
                                 }
                             }
-                        } else if isCheckingStoredSession {
-                            ProgressView(L10n.s("session.validating"))
-                                .controlSize(.small)
-                        }
 
-                        if !isLoggedIn {
-                            Button(L10n.s("login.title")) {
-                                showLoginDialog = true
+                            if isLoggedIn {
+                                Divider()
+
+                                sectionSkeletonView
+                                    .frame(
+                                        maxWidth: .infinity,
+                                        maxHeight: .infinity,
+                                        alignment: .topLeading)
                             }
                         }
-
-                        if isLoggedIn {
-                            Divider()
-
-                            sectionSkeletonView
-                                .frame(
-                                    maxWidth: .infinity,
-                                    maxHeight: .infinity,
-                                    alignment: .topLeading)
-                        }
+                        .padding(24)
+                        .frame(minHeight: proxy.size.height, alignment: .topLeading)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
-                    .padding(24)
-                    .frame(minHeight: proxy.size.height, alignment: .topLeading)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .scrollIndicators(.automatic)
                 }
-                .scrollIndicators(.automatic)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                Divider()
+
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                    Text(statusBarMessage ?? L10n.s("status.ready"))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .font(.footnote)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.quaternary.opacity(0.2))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -246,6 +265,10 @@ struct ContentView: View {
         }
         .task {
             await authenticateStoredSessionOnStartup()
+        }
+        .onDisappear {
+            clearStatusBarTask?.cancel()
+            clearStatusBarTask = nil
         }
     }
 
@@ -417,9 +440,15 @@ struct ContentView: View {
                 title: L10n.s("section.documents"),
                 subtitle: L10n.s("section.documents.subtitle"))
         case .passwords:
-            SectionSkeletonView(
-                title: L10n.s("section.passwords"),
-                subtitle: L10n.s("section.passwords.subtitle"))
+            PasswordsView(
+                service: service,
+                authentication: authentication,
+                userInfo: userInfo,
+                dataProtectionSecurityKey: dataProtectionSecurityKey,
+                isLoggedIn: isLoggedIn,
+                onStatusMessage: { message in
+                    showStatusBarMessage(message)
+                })
         case .contacts:
             ContactsView(
                 service: service,
@@ -444,6 +473,21 @@ struct ContentView: View {
                 .font(.largeTitle)
             Text(L10n.s("workspace.subtitle"))
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    @MainActor
+    private func showStatusBarMessage(_ message: String) {
+        statusBarMessage = message
+        clearStatusBarTask?.cancel()
+        clearStatusBarTask = Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if Task.isCancelled {
+                return
+            }
+            await MainActor.run {
+                statusBarMessage = nil
+            }
         }
     }
 

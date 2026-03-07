@@ -59,6 +59,58 @@ struct Note: Codable, Identifiable {
     var lastModifiedUtc: String?
 }
 
+struct PasswordItem: Codable, Identifiable {
+    var id: UUID = UUID()
+    var name: String
+    var url: String
+    var login: String
+    var description: String
+    var password: String
+
+    enum CodingKeys: String, CodingKey {
+        case name = "Name"
+        case url = "Url"
+        case login = "Login"
+        case description = "Description"
+        case password = "Password"
+    }
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        url: String,
+        login: String,
+        description: String,
+        password: String
+    ) {
+        self.id = id
+        self.name = name
+        self.url = url
+        self.login = login
+        self.description = description
+        self.password = password
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = UUID()
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        url = try container.decodeIfPresent(String.self, forKey: .url) ?? ""
+        login = try container.decodeIfPresent(String.self, forKey: .login) ?? ""
+        description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
+        password = try container.decodeIfPresent(String.self, forKey: .password) ?? ""
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(url, forKey: .url)
+        try container.encode(login, forKey: .login)
+        try container.encode(description, forKey: .description)
+        try container.encode(password, forKey: .password)
+    }
+}
+
 protocol Servicing {
 
     // authentication
@@ -104,6 +156,32 @@ protocol Servicing {
     func saveContacts(
         token: String, contacts: [ContactItem], encryptionKey: String, passwordManagerSalt: String)
         async throws
+
+    // passwords
+
+    func getPasswordItems(token: String, encryptionKey: String, passwordManagerSalt: String)
+        async throws -> [PasswordItem]
+
+    func savePasswordItems(
+        token: String,
+        passwordItems: [PasswordItem],
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws
+
+    func decodePassword(
+        token: String,
+        encryptedPassword: String,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> String
+
+    func encodePassword(
+        token: String,
+        password: String,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> String
 
     // error translations
 
@@ -530,6 +608,87 @@ struct RemoteService: Servicing {
         try checkResponse(response, data: data)
     }
 
+    // passwords
+
+    func getPasswordItems(
+        token: String,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> [PasswordItem] {
+        var request = URLRequest(url: URL(string: "/api/pwdman/file", relativeTo: baseURL)!)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        let encrypted = try JSONDecoder().decode(String.self, from: data)
+        guard !encrypted.isEmpty else {
+            return []
+        }
+        let json = try cryptoService.decryptText(
+            encrypted,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+        let items = try JSONDecoder().decode([PasswordItem].self, from: Data(json.utf8))
+        return items.sorted(by: sortPasswordItemsByName)
+    }
+
+    func savePasswordItems(
+        token: String,
+        passwordItems: [PasswordItem],
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws {
+        guard !encryptionKey.isEmpty else {
+            throw ServiceError.noDataProtectionKey
+        }
+        let sortedItems = passwordItems.sorted(by: sortPasswordItemsByName)
+        let jsonData = try JSONEncoder().encode(sortedItems)
+        let jsonString = String(data: jsonData, encoding: .utf8) ?? "[]"
+        let encrypted = try cryptoService.encryptText(
+            jsonString,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+
+        var request = URLRequest(url: URL(string: "/api/pwdman/file", relativeTo: baseURL)!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.httpBody = try JSONEncoder().encode(encrypted)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+    }
+
+    func decodePassword(
+        token: String,
+        encryptedPassword: String,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> String {
+        guard !token.isEmpty else {
+            throw ServiceError.invalidCredentials
+        }
+        return try cryptoService.decryptText(
+            encryptedPassword,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+    }
+
+    func encodePassword(
+        token: String,
+        password: String,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> String {
+        guard !token.isEmpty else {
+            throw ServiceError.invalidCredentials
+        }
+        return try cryptoService.encryptText(
+            password,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+    }
+
     private func decodeNoteFields(
         _ note: Note,
         encryptionKey: String,
@@ -571,6 +730,19 @@ struct RemoteService: Servicing {
             let body = String(data: data, encoding: .utf8) ?? "<non-utf8-response>"
             print("[RemoteService] Response \(endpoint): \(body)")
         #endif
+    }
+
+    private func sortPasswordItemsByName(_ lhs: PasswordItem, _ rhs: PasswordItem) -> Bool {
+        let lhsName = lhs.name.trimmingCharacters(in: .whitespacesAndNewlines).localizedLowercase
+        let rhsName = rhs.name.trimmingCharacters(in: .whitespacesAndNewlines).localizedLowercase
+        if lhsName == rhsName {
+            let lhsSecondary =
+                "\(lhs.login)|\(lhs.url)|\(lhs.description)|\(lhs.password)".localizedLowercase
+            let rhsSecondary =
+                "\(rhs.login)|\(rhs.url)|\(rhs.description)|\(rhs.password)".localizedLowercase
+            return lhsSecondary < rhsSecondary
+        }
+        return lhsName < rhsName
     }
 }
 

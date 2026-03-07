@@ -14,6 +14,7 @@
 "workspace.title" = "Personal Workspace";
 "workspace.subtitle" = "Organize your notes, documents, passwords, contacts, appointments, and diary entries in one place.";
 "session.validating" = "Validating saved session...";
+"status.ready" = "Ready";
 
 "section.notes" = "Notes";
 "section.documents" = "Documents";
@@ -26,6 +27,48 @@
 "section.passwords.subtitle" = "Manage all passwords";
 "section.appointments.subtitle" = "Manage all appointments";
 "section.diaryEntries.subtitle" = "Manage all diary entries";
+
+"passwords.reload" = "Reload passwords";
+"passwords.add" = "Add password";
+"passwords.uploading" = "Uploading passwords...";
+"passwords.loading" = "Loading passwords...";
+"passwords.empty" = "No passwords available.";
+"passwords.empty.noFile" = "No password file uploaded yet. Add an item to create one.";
+"passwords.noName" = "(No name)";
+"passwords.thisPassword" = "this password";
+"passwords.delete" = "Delete password";
+"passwords.delete.title" = "Delete Password?";
+"passwords.delete.message.format" = "Do you want to delete %@?";
+"passwords.selectPrompt" = "Select a password item to view details.";
+"passwords.password" = "Password";
+"passwords.help.saveChanges" = "Save changes";
+"passwords.help.edit" = "Edit password";
+"passwords.field.name" = "Name";
+"passwords.field.url" = "URL";
+"passwords.field.login" = "Login";
+"passwords.field.description" = "Description";
+"passwords.field.password" = "Password";
+"passwords.openURL" = "Open URL";
+"passwords.copyURL" = "Copy URL";
+"passwords.copyLogin" = "Copy login";
+"passwords.copyPassword" = "Copy password";
+"passwords.copyDescription" = "Copy description";
+"passwords.show" = "Show password";
+"passwords.hide" = "Hide password";
+"passwords.status.openedURL" = "URL opened.";
+"passwords.status.copiedURL" = "URL copied to clipboard.";
+"passwords.status.copiedLogin" = "Login copied to clipboard.";
+"passwords.status.copiedPassword" = "Password copied to clipboard.";
+"passwords.status.copiedDescription" = "Description copied to clipboard.";
+"passwords.error.setKey.load" = "Set your data protection key to load passwords.";
+"passwords.error.setKey.upload" = "Set your data protection key to upload passwords.";
+"passwords.error.setKey.create" = "Set your data protection key to create passwords.";
+"passwords.error.setKey.decode" = "Set your data protection key to decode passwords.";
+"passwords.error.invalidURL" = "The URL is invalid.";
+"passwords.error.load" = "Failed to load passwords.";
+"passwords.error.upload" = "Failed to upload passwords.";
+"passwords.error.encode" = "Failed to encrypt password.";
+"passwords.error.decode" = "Failed to decrypt password.";
 
 "user.details" = "User Details";
 "user.details.expand" = "Expand user details";

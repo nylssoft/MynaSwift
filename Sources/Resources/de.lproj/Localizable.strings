@@ -14,6 +14,7 @@
 "workspace.title" = "Persönlicher Arbeitsbereich";
 "workspace.subtitle" = "Organisieren Sie Ihre Notizen, Dokumente, Passwörter, Kontakte, Termine und Tagebucheinträge an einem Ort.";
 "session.validating" = "Gespeicherte Sitzung wird überprüft...";
+"status.ready" = "Bereit";
 
 "section.notes" = "Notizen";
 "section.documents" = "Dokumente";
@@ -26,6 +27,48 @@
 "section.passwords.subtitle" = "Alle Passwörter verwalten";
 "section.appointments.subtitle" = "Alle Termine verwalten";
 "section.diaryEntries.subtitle" = "Alle Tagebucheinträge verwalten";
+
+"passwords.reload" = "Passwörter neu laden";
+"passwords.add" = "Passwort hinzufügen";
+"passwords.uploading" = "Passwörter werden hochgeladen...";
+"passwords.loading" = "Passwörter werden geladen...";
+"passwords.empty" = "Keine Passwörter verfügbar.";
+"passwords.empty.noFile" = "Es wurde noch keine Passwortdatei hochgeladen. Fügen Sie ein Element hinzu, um eine zu erstellen.";
+"passwords.noName" = "(Kein Name)";
+"passwords.thisPassword" = "dieses Passwort";
+"passwords.delete" = "Passwort löschen";
+"passwords.delete.title" = "Passwort löschen?";
+"passwords.delete.message.format" = "Möchten Sie %@ löschen?";
+"passwords.selectPrompt" = "Wählen Sie ein Passwort aus, um Details anzuzeigen.";
+"passwords.password" = "Passwort";
+"passwords.help.saveChanges" = "Änderungen speichern";
+"passwords.help.edit" = "Passwort bearbeiten";
+"passwords.field.name" = "Name";
+"passwords.field.url" = "URL";
+"passwords.field.login" = "Anmeldung";
+"passwords.field.description" = "Beschreibung";
+"passwords.field.password" = "Passwort";
+"passwords.openURL" = "URL öffnen";
+"passwords.copyURL" = "URL kopieren";
+"passwords.copyLogin" = "Anmeldung kopieren";
+"passwords.copyPassword" = "Passwort kopieren";
+"passwords.copyDescription" = "Beschreibung kopieren";
+"passwords.show" = "Passwort anzeigen";
+"passwords.hide" = "Passwort ausblenden";
+"passwords.status.openedURL" = "URL geöffnet.";
+"passwords.status.copiedURL" = "URL in Zwischenablage kopiert.";
+"passwords.status.copiedLogin" = "Anmeldung in Zwischenablage kopiert.";
+"passwords.status.copiedPassword" = "Passwort in Zwischenablage kopiert.";
+"passwords.status.copiedDescription" = "Beschreibung in Zwischenablage kopiert.";
+"passwords.error.setKey.load" = "Setzen Sie Ihren Datenschutzschlüssel, um Passwörter zu laden.";
+"passwords.error.setKey.upload" = "Setzen Sie Ihren Datenschutzschlüssel, um Passwörter hochzuladen.";
+"passwords.error.setKey.create" = "Setzen Sie Ihren Datenschutzschlüssel, um Passwörter zu erstellen.";
+"passwords.error.setKey.decode" = "Setzen Sie Ihren Datenschutzschlüssel, um Passwörter zu entschlüsseln.";
+"passwords.error.invalidURL" = "Die URL ist ungültig.";
+"passwords.error.load" = "Passwörter konnten nicht geladen werden.";
+"passwords.error.upload" = "Passwörter konnten nicht hochgeladen werden.";
+"passwords.error.encode" = "Passwort konnte nicht verschlüsselt werden.";
+"passwords.error.decode" = "Passwort konnte nicht entschlüsselt werden.";
 
 "user.details" = "Benutzerdetails";
 "user.details.expand" = "Benutzerdetails ausklappen";
