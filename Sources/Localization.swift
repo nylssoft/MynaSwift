@@ -30,18 +30,18 @@ enum L10n {
     }
 
     private static func effectiveLanguageIdentifier() -> String {
-#if DEBUG
-        if let override = UserDefaults.standard.string(forKey: "debug.locale.override") {
-            switch override {
-            case "de":
-                return "de"
-            case "en":
-                return "en"
-            default:
-                break
+        #if DEBUG
+            if let override = UserDefaults.standard.string(forKey: "debug.locale.override") {
+                switch override {
+                case "de":
+                    return "de"
+                case "en":
+                    return "en"
+                default:
+                    break
+                }
             }
-        }
-#endif
+        #endif
         return Locale.preferredLanguages.first ?? "en"
     }
 

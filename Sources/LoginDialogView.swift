@@ -98,8 +98,9 @@ struct LoginDialogView: View {
                 ProgressView(
                     isAwaitingSecondFactor
                         ? L10n.s("login.progress.completing2fa")
-                        : L10n.s("login.progress.signingIn"))
-                    .controlSize(.small)
+                        : L10n.s("login.progress.signingIn")
+                )
+                .controlSize(.small)
             }
         }
         .padding(20)

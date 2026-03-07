@@ -207,7 +207,8 @@ struct NotesView: View {
             let token,
             let passwordManagerSalt
         else {
-            notesErrorMessage = isLoggedIn ? L10n.s("notes.error.setKey") : L10n.s("notes.error.loginRequired")
+            notesErrorMessage =
+                isLoggedIn ? L10n.s("notes.error.setKey") : L10n.s("notes.error.loginRequired")
             notes = []
             hasLoadedNotes = false
             clearSelection()
@@ -438,13 +439,6 @@ private struct NoteDetailView: View {
     let onToggleEdit: () -> Void
     let onDelete: () -> Void
 
-    private var lastModifiedFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -510,7 +504,9 @@ private struct NoteDetailView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     } else {
                         Text(readOnlyText(contentDraft))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            .frame(
+                                maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading
+                            )
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
                             .background(Color(nsColor: .textBackgroundColor))
@@ -537,24 +533,7 @@ private struct NoteDetailView: View {
         else {
             return nil
         }
-
-        if let unixValue = Int64(value) {
-            let seconds = unixValue > 9_999_999_999
-                ? TimeInterval(unixValue) / 1000.0
-                : TimeInterval(unixValue)
-            return lastModifiedFormatter.string(from: Date(timeIntervalSince1970: seconds))
-        }
-
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: value) {
-            return lastModifiedFormatter.string(from: date)
-        }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        if let date = isoFormatter.date(from: value) {
-            return lastModifiedFormatter.string(from: date)
-        }
-        return value
+        return DateFormattingUtility.displayDate(fromUnixOrISO: value)
     }
 
     private func readOnlyText(_ value: String) -> String {

@@ -128,6 +128,6 @@
 "service.error.noDataProtectionKey" = "No data protection key configured.";
 "service.error.missingEncryptionKeyConfig" = "Missing encryption key configuration.";
 "service.error.deriveEncryptionKey" = "Could not derive encryption key.";
-"service.error.encryptContacts" = "Could not encrypt contact data.";
+"service.error.encryptData" = "Could not encrypt data.";
 "service.error.invalidDataProtectionKey" = "Invalid data protection key.";
 "service.error.serverStatusCode.format" = "Server responded with status code %d.";

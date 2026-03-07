@@ -1,5 +1,3 @@
-import CommonCrypto
-import CryptoKit
 import Foundation
 
 struct UserInfoResponse: Decodable {
@@ -61,38 +59,6 @@ struct Note: Codable, Identifiable {
     var lastModifiedUtc: String?
 }
 
-enum ServiceError: LocalizedError {
-    case emptyCredentials
-    case invalidCredentials
-    case twoFactorCodeRequired
-    case twoFactorTokenMissing
-    case invalidURL
-    case networkError
-    case serverError(String)
-    case decodingError
-
-    var errorDescription: String? {
-        switch self {
-        case .emptyCredentials:
-            return L10n.s("service.error.emptyCredentials")
-        case .twoFactorCodeRequired:
-            return L10n.s("service.error.twoFactorCodeRequired")
-        case .twoFactorTokenMissing:
-            return L10n.s("service.error.twoFactorTokenMissing")
-        case .invalidURL:
-            return L10n.s("service.error.invalidURL")
-        case .networkError:
-            return L10n.s("service.error.network")
-        case .invalidCredentials:
-            return L10n.s("service.error.invalidCredentials")
-        case .serverError(let message):
-            return message
-        case .decodingError:
-            return L10n.s("service.error.decoding")
-        }
-    }
-}
-
 protocol Servicing {
 
     // authentication
@@ -118,44 +84,26 @@ protocol Servicing {
     func getNote(token: String, id: Int64, encryptionKey: String, passwordManagerSalt: String)
         async throws -> Note
 
-    func createNewNote(token: String, title: String, encryptionKey: String, passwordManagerSalt: String)
-        async throws -> Int64
+    func createNewNote(
+        token: String, title: String, encryptionKey: String, passwordManagerSalt: String
+    ) async throws -> Int64
 
     func deleteNote(token: String, id: Int64) async throws
 
     func updateNote(
-        token: String,
-        id: Int64,
-        title: String,
-        content: String,
-        encryptionKey: String,
+        token: String, id: Int64, title: String, content: String, encryptionKey: String,
         passwordManagerSalt: String
     ) async throws -> String
 
     // contacts
 
-    func loadEncodedContacts(token: String) async throws -> String
+    func loadContacts(token: String, encryptionKey: String, passwordManagerSalt: String)
+        async throws
+        -> [ContactItem]
 
-    func saveEncodedContacts(token: String, encodedContacts: String) async throws
-
-    func decodeContactText(encrypted: String, encryptionKey: String, passwordManagerSalt: String)
-        throws -> String
-
-    func encodeContactText(text: String, encryptionKey: String, passwordManagerSalt: String)
-        throws -> String
-
-    func getContactItems(
-        token: String,
-        encryptionKey: String,
-        passwordManagerSalt: String
-    ) async throws -> [ContactItem]
-
-    func uploadContactItems(
-        token: String,
-        contactItems: [ContactItem],
-        encryptionKey: String,
-        passwordManagerSalt: String
-    ) async throws
+    func saveContacts(
+        token: String, contacts: [ContactItem], encryptionKey: String, passwordManagerSalt: String)
+        async throws
 
     // error translations
 
@@ -208,9 +156,16 @@ final class AuthSessionStore {
         static let encryptedSecurityKeyPrefix = "mynaswift.session.encryptedSecurityKey"
     }
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+    private let cryptoService: CryptoServicing
 
-    private init() {}
+    init(
+        defaults: UserDefaults = .standard,
+        cryptoService: CryptoServicing = CryptoService.shared
+    ) {
+        self.defaults = defaults
+        self.cryptoService = cryptoService
+    }
 
     var keepLoginEnabled: Bool {
         defaults.object(forKey: Keys.keepLoginEnabled) as? Bool ?? true
@@ -259,15 +214,12 @@ final class AuthSessionStore {
             return
         }
         do {
-            let symmetricKey = try deriveSymmetricKey(passwordManagerSalt: passwordManagerSalt)
-            let plaintext = Data(securityKey.utf8)
-            let sealed = try AES.GCM.seal(plaintext, using: symmetricKey)
-            guard let combined = sealed.combined else {
-                clearDataProtectionSecurityKey(userID: userID)
-                return
-            }
+            let combined = try cryptoService.encryptSecurityKey(
+                securityKey,
+                passwordManagerSalt: passwordManagerSalt)
             defaults.set(
-                combined.base64EncodedString(), forKey: encryptedSecurityStorageKey(userID: userID))
+                combined,
+                forKey: encryptedSecurityStorageKey(userID: userID))
         } catch {
             clearDataProtectionSecurityKey(userID: userID)
         }
@@ -275,16 +227,14 @@ final class AuthSessionStore {
 
     func loadDataProtectionSecurityKey(userID: Int64, passwordManagerSalt: String) -> String? {
         guard !passwordManagerSalt.isEmpty,
-            let encrypted = defaults.string(forKey: encryptedSecurityStorageKey(userID: userID)),
-            let encryptedData = Data(base64Encoded: encrypted)
+            let encrypted = defaults.string(forKey: encryptedSecurityStorageKey(userID: userID))
         else {
             return nil
         }
         do {
-            let symmetricKey = try deriveSymmetricKey(passwordManagerSalt: passwordManagerSalt)
-            let sealedBox = try AES.GCM.SealedBox(combined: encryptedData)
-            let decryptedData = try AES.GCM.open(sealedBox, using: symmetricKey)
-            return String(data: decryptedData, encoding: .utf8)
+            return try cryptoService.decryptSecurityKey(
+                encrypted,
+                passwordManagerSalt: passwordManagerSalt)
         } catch {
             return nil
         }
@@ -301,21 +251,24 @@ final class AuthSessionStore {
     private func encryptedSecurityStorageKey(userID: Int64) -> String {
         "\(Keys.encryptedSecurityKeyPrefix).\(userID)"
     }
-
-    private func deriveSymmetricKey(passwordManagerSalt: String) throws -> SymmetricKey {
-        guard !passwordManagerSalt.isEmpty else {
-            throw ServiceError.serverError(L10n.s("service.error.missingPasswordManagerSalt"))
-        }
-        let hash = SHA256.hash(data: Data(passwordManagerSalt.utf8))
-        return SymmetricKey(data: Data(hash))
-    }
 }
 
 struct RemoteService: Servicing {
-    private let baseURL = URL(string: "https://www.stockfleth.eu")
+    private let baseURL: URL?
+    private let cryptoService: CryptoServicing
     private static let translationQueue = DispatchQueue(
         label: "mynaswift.translation.map", attributes: .concurrent)
     private static var translationMap: [String: String]?
+
+    init(
+        baseURL: URL? = URL(string: "https://www.stockfleth.eu"),
+        cryptoService: CryptoServicing = CryptoService.shared
+    ) {
+        self.baseURL = baseURL
+        self.cryptoService = cryptoService
+    }
+
+    // error message translations
 
     func initializeTranslations(locale: String) async throws {
         let localeURLRequest = URLRequest(
@@ -363,6 +316,8 @@ struct RemoteService: Servicing {
         }
         return map[symbol] ?? symbol
     }
+
+    // authentication
 
     func authenticate(username: String, password: String) async throws -> AuthenticationResponse {
         let clientIdentity: ClientIdentity = ClientIdentityStore.shared.loadOrCreateIdentity()
@@ -439,20 +394,18 @@ struct RemoteService: Servicing {
         try checkResponse(response, data: data)
     }
 
+    // notes
+
     func getNotes(token: String, encryptionKey: String, passwordManagerSalt: String) async throws
         -> [Note]
     {
-        guard !encryptionKey.isEmpty else {
-            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
-        }
         var request = URLRequest(url: URL(string: "/api/notes/note", relativeTo: baseURL)!)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(token, forHTTPHeaderField: "token")
         let (data, response) = try await URLSession.shared.data(for: request)
         try checkResponse(response, data: data)
-        debugLogResponse(endpoint: "/api/notes/note", data: data)
-        let encryptedNotes = try decodeNotes(from: data)
+        let encryptedNotes = try JSONDecoder().decode([Note].self, from: data)
         return try encryptedNotes.map { note in
             try decodeNoteFields(
                 note,
@@ -465,17 +418,13 @@ struct RemoteService: Servicing {
     func getNote(token: String, id: Int64, encryptionKey: String, passwordManagerSalt: String)
         async throws -> Note
     {
-        guard !encryptionKey.isEmpty else {
-            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
-        }
         var request = URLRequest(url: URL(string: "/api/notes/note/\(id)", relativeTo: baseURL)!)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(token, forHTTPHeaderField: "token")
         let (data, response) = try await URLSession.shared.data(for: request)
         try checkResponse(response, data: data)
-        debugLogResponse(endpoint: "/api/notes/note/\(id)", data: data)
-        let encryptedNote = try decodeNote(from: data)
+        let encryptedNote = try JSONDecoder().decode(Note.self, from: data)
         return try decodeNoteFields(
             encryptedNote,
             encryptionKey: encryptionKey,
@@ -483,16 +432,13 @@ struct RemoteService: Servicing {
             includeContent: true)
     }
 
-    func createNewNote(token: String, title: String, encryptionKey: String, passwordManagerSalt: String)
+    func createNewNote(
+        token: String, title: String, encryptionKey: String, passwordManagerSalt: String
+    )
         async throws -> Int64
     {
-        guard !encryptionKey.isEmpty else {
-            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
-        }
-        let encryptedTitle = try encodeContactText(
-            text: title,
-            encryptionKey: encryptionKey,
-            passwordManagerSalt: passwordManagerSalt)
+        let encryptedTitle = try cryptoService.encryptText(
+            title, encryptionKey: encryptionKey, passwordManagerSalt: passwordManagerSalt)
         var request = URLRequest(url: URL(string: "/api/notes/note", relativeTo: baseURL)!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -520,17 +466,10 @@ struct RemoteService: Servicing {
         encryptionKey: String,
         passwordManagerSalt: String
     ) async throws -> String {
-        guard !encryptionKey.isEmpty else {
-            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
-        }
-        let encryptedTitle = try encodeContactText(
-            text: title,
-            encryptionKey: encryptionKey,
-            passwordManagerSalt: passwordManagerSalt)
-        let encryptedContent = try encodeContactText(
-            text: content,
-            encryptionKey: encryptionKey,
-            passwordManagerSalt: passwordManagerSalt)
+        let encryptedTitle = try cryptoService.encryptText(
+            title, encryptionKey: encryptionKey, passwordManagerSalt: passwordManagerSalt)
+        let encryptedContent = try cryptoService.encryptText(
+            content, encryptionKey: encryptionKey, passwordManagerSalt: passwordManagerSalt)
         var request = URLRequest(url: URL(string: "/api/notes/note", relativeTo: baseURL)!)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -539,133 +478,56 @@ struct RemoteService: Servicing {
             UpdateNoteRequest(id: id, title: encryptedTitle, content: encryptedContent))
         let (data, response) = try await URLSession.shared.data(for: request)
         try checkResponse(response, data: data)
-        debugLogResponse(endpoint: "/api/notes/note [PUT]", data: data)
         return try JSONDecoder().decode(String.self, from: data)
     }
 
-    func loadEncodedContacts(token: String) async throws -> String {
+    // contacts
+
+    func loadContacts(
+        token: String,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> [ContactItem] {
         var request = URLRequest(url: URL(string: "/api/contacts", relativeTo: baseURL)!)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(token, forHTTPHeaderField: "token")
         let (data, response) = try await URLSession.shared.data(for: request)
         try checkResponse(response, data: data)
-        return try JSONDecoder().decode(String.self, from: data)
-    }
-
-    func saveEncodedContacts(token: String, encodedContacts: String) async throws {
-        var request = URLRequest(url: URL(string: "/api/contacts", relativeTo: baseURL)!)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(token, forHTTPHeaderField: "token")
-        request.httpBody = try JSONEncoder().encode(encodedContacts)
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try checkResponse(response, data: data)
-    }
-
-    func decodeContactText(encrypted: String, encryptionKey: String, passwordManagerSalt: String)
-        throws -> String
-    {
-        guard !encrypted.isEmpty else {
-            return ""
-        }
-        let cryptoKey = try deriveCryptoKey(
-            encryptionKey: encryptionKey,
-            passwordManagerSalt: passwordManagerSalt)
-        let encryptedData = try Data(hexString: encrypted)
-        let plainData = try decryptData(encryptedData, key: cryptoKey)
-        return String(data: plainData, encoding: .utf8) ?? ""
-    }
-
-    func encodeContactText(text: String, encryptionKey: String, passwordManagerSalt: String)
-        throws -> String
-    {
-        let cryptoKey = try deriveCryptoKey(
-            encryptionKey: encryptionKey,
-            passwordManagerSalt: passwordManagerSalt)
-        let plainData = Data(text.utf8)
-        let encryptedData = try encryptData(plainData, key: cryptoKey)
-        return encryptedData.hexUppercasedString
-    }
-
-    func getContactItems(
-        token: String,
-        encryptionKey: String,
-        passwordManagerSalt: String
-    ) async throws -> [ContactItem] {
-        guard !encryptionKey.isEmpty else {
-            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
-        }
-        let encrypted = try await loadEncodedContacts(token: token)
+        let encrypted = try JSONDecoder().decode(String.self, from: data)
         guard !encrypted.isEmpty else {
             return []
         }
-        let json = try decodeContactText(
-            encrypted: encrypted,
-            encryptionKey: encryptionKey,
-            passwordManagerSalt: passwordManagerSalt)
+        let json = try cryptoService.decryptText(
+            encrypted, encryptionKey: encryptionKey, passwordManagerSalt: passwordManagerSalt)
         let payload = try JSONDecoder().decode(ContactData.self, from: Data(json.utf8))
         return payload.items
     }
 
-    func uploadContactItems(
+    func saveContacts(
         token: String,
-        contactItems: [ContactItem],
+        contacts: [ContactItem],
         encryptionKey: String,
         passwordManagerSalt: String
     ) async throws {
         guard !encryptionKey.isEmpty else {
-            throw ServiceError.serverError(L10n.s("service.error.noDataProtectionKey"))
+            throw ServiceError.noDataProtectionKey
         }
-        let sortedItems = contactItems.sorted { $0.id < $1.id }
+        let sortedItems = contacts.sorted { $0.id < $1.id }
         let nextId = (sortedItems.map(\.id).max() ?? 0) + 1
         let payload = ContactData(nextId: nextId, version: 1, items: sortedItems)
         let jsonData = try JSONEncoder().encode(payload)
         let jsonString =
             String(data: jsonData, encoding: .utf8) ?? "{\"nextId\":1,\"version\":1,\"items\":[]}"
-        let encoded = try encodeContactText(
-            text: jsonString,
-            encryptionKey: encryptionKey,
-            passwordManagerSalt: passwordManagerSalt)
-        try await saveEncodedContacts(token: token, encodedContacts: encoded)
-    }
-
-    private func deriveCryptoKey(encryptionKey: String, passwordManagerSalt: String) throws -> Data
-    {
-        guard !encryptionKey.isEmpty, !passwordManagerSalt.isEmpty else {
-            throw ServiceError.serverError(L10n.s("service.error.missingEncryptionKeyConfig"))
-        }
-        let keyLength = kCCKeySizeAES256
-        var derivedKey = Data(repeating: 0, count: keyLength)
-        let status = derivedKey.withUnsafeMutableBytes { derivedKeyBytes in
-            passwordManagerSalt.withCString { saltCString in
-                encryptionKey.withCString { passwordCString in
-                    CCKeyDerivationPBKDF(
-                        CCPBKDFAlgorithm(kCCPBKDF2),
-                        passwordCString,
-                        encryptionKey.lengthOfBytes(using: .utf8),
-                        UnsafePointer<UInt8>(OpaquePointer(saltCString)),
-                        passwordManagerSalt.lengthOfBytes(using: .utf8),
-                        CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256),
-                        1000,
-                        derivedKeyBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                        keyLength
-                    )
-                }
-            }
-        }
-        guard status == kCCSuccess else {
-            throw ServiceError.serverError(L10n.s("service.error.deriveEncryptionKey"))
-        }
-        return derivedKey
-    }
-
-    private func decodeNotes(from data: Data) throws -> [Note] {
-        try JSONDecoder().decode([Note].self, from: data)
-    }
-
-    private func decodeNote(from data: Data) throws -> Note {
-        try JSONDecoder().decode(Note.self, from: data)
+        let encoded = try cryptoService.encryptText(
+            jsonString, encryptionKey: encryptionKey, passwordManagerSalt: passwordManagerSalt)
+        var request = URLRequest(url: URL(string: "/api/contacts", relativeTo: baseURL)!)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.httpBody = try JSONEncoder().encode(encoded)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
     }
 
     private func decodeNoteFields(
@@ -675,40 +537,18 @@ struct RemoteService: Servicing {
         includeContent: Bool
     ) throws -> Note {
         var decoded = note
-        decoded.title = try decodeContactText(
-            encrypted: note.title,
-            encryptionKey: encryptionKey,
-            passwordManagerSalt: passwordManagerSalt)
+        decoded.title = try cryptoService.decryptText(
+            note.title, encryptionKey: encryptionKey, passwordManagerSalt: passwordManagerSalt)
         if includeContent {
             if let encryptedContent = note.content {
-                decoded.content = try decodeContactText(
-                    encrypted: encryptedContent,
-                    encryptionKey: encryptionKey,
+                decoded.content = try cryptoService.decryptText(
+                    encryptedContent, encryptionKey: encryptionKey,
                     passwordManagerSalt: passwordManagerSalt)
             } else {
                 decoded.content = nil
             }
         }
         return decoded
-    }
-
-    private func encryptData(_ plainData: Data, key: Data) throws -> Data {
-        let symmetricKey = SymmetricKey(data: key)
-        let sealedBox = try AES.GCM.seal(plainData, using: symmetricKey)
-        guard let combined = sealedBox.combined else {
-            throw ServiceError.serverError(L10n.s("service.error.encryptContacts"))
-        }
-        return combined
-    }
-
-    private func decryptData(_ encryptedData: Data, key: Data) throws -> Data {
-        let symmetricKey = SymmetricKey(data: key)
-        do {
-            let sealedBox = try AES.GCM.SealedBox(combined: encryptedData)
-            return try AES.GCM.open(sealedBox, using: symmetricKey)
-        } catch {
-            throw ServiceError.serverError(L10n.s("service.error.invalidDataProtectionKey"))
-        }
     }
 
     private func checkResponse(_ response: URLResponse, data: Data) throws {
@@ -722,18 +562,15 @@ struct RemoteService: Servicing {
             {
                 throw ServiceError.serverError(translate(symbol: message))
             }
-            throw ServiceError.serverError(
-                String(
-                    format: L10n.s("service.error.serverStatusCode.format"),
-                    httpResponse.statusCode))
+            throw ServiceError.serverStatusCode(httpResponse.statusCode)
         }
     }
 
     private func debugLogResponse(endpoint: String, data: Data) {
-#if DEBUG
-        let body = String(data: data, encoding: .utf8) ?? "<non-utf8-response>"
-        print("[RemoteService] Response \(endpoint): \(body)")
-#endif
+        #if DEBUG
+            let body = String(data: data, encoding: .utf8) ?? "<non-utf8-response>"
+            print("[RemoteService] Response \(endpoint): \(body)")
+        #endif
     }
 }
 
@@ -774,30 +611,4 @@ private struct UpdateNoteRequest: Encodable {
 private struct APIErrorResponse: Decodable {
     let title: String?
     let status: Int?
-}
-
-extension Data {
-    fileprivate init(hexString: String) throws {
-        guard hexString.count.isMultiple(of: 2) else {
-            throw ServiceError.decodingError
-        }
-        var data = Data()
-        data.reserveCapacity(hexString.count / 2)
-
-        var index = hexString.startIndex
-        while index < hexString.endIndex {
-            let nextIndex = hexString.index(index, offsetBy: 2)
-            let byteString = hexString[index..<nextIndex]
-            guard let value = UInt8(byteString, radix: 16) else {
-                throw ServiceError.decodingError
-            }
-            data.append(value)
-            index = nextIndex
-        }
-        self = data
-    }
-
-    fileprivate var hexUppercasedString: String {
-        self.map { String(format: "%02X", $0) }.joined()
-    }
 }

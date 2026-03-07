@@ -128,6 +128,6 @@
 "service.error.noDataProtectionKey" = "Kein Datenschutzschlüssel konfiguriert.";
 "service.error.missingEncryptionKeyConfig" = "Verschlüsselungsschlüssel-Konfiguration fehlt.";
 "service.error.deriveEncryptionKey" = "Verschlüsselungsschlüssel konnte nicht abgeleitet werden.";
-"service.error.encryptContacts" = "Kontaktdaten konnten nicht verschlüsselt werden.";
+"service.error.encryptData" = "Daten konnten nicht verschlüsselt werden.";
 "service.error.invalidDataProtectionKey" = "Ungültiger Datenschutzschlüssel.";
 "service.error.serverStatusCode.format" = "Server antwortete mit Statuscode %d.";

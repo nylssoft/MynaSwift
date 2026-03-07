@@ -60,9 +60,9 @@ struct ContentView: View {
     @State private var dataProtectionSecurityKey = ""
     @State private var isLoggingOut = false
     @AppStorage("contentView.isUserDetailsCollapsed") private var isUserDetailsCollapsed = false
-#if DEBUG
-    @AppStorage("debug.locale.override") private var debugLocaleOverride = "system"
-#endif
+    #if DEBUG
+        @AppStorage("debug.locale.override") private var debugLocaleOverride = "system"
+    #endif
 
     private let service: Servicing = RemoteService()
 
@@ -76,11 +76,11 @@ struct ContentView: View {
     }
 
     private var translationTaskID: String {
-#if DEBUG
-        return debugLocaleOverride
-#else
-        return Locale.preferredLanguages.first ?? "system"
-#endif
+        #if DEBUG
+            return debugLocaleOverride
+        #else
+            return Locale.preferredLanguages.first ?? "system"
+        #endif
     }
 
     var body: some View {
@@ -127,7 +127,8 @@ struct ContentView: View {
                     idealWidth: 56,
                     maxWidth: 56,
                     maxHeight: .infinity,
-                    alignment: .top)
+                    alignment: .top
+                )
                 .background(.quaternary.opacity(0.35))
 
                 Divider()
@@ -384,42 +385,21 @@ struct ContentView: View {
     }
 
     private var lastLoginText: String? {
-        guard let lastLoginUtc = userInfo?.lastLoginUtc,
-            let date = parseUTCISODate(lastLoginUtc)
-        else {
+        guard let lastLoginUtc = userInfo?.lastLoginUtc else {
             return nil
         }
-        return displayDateFormatter.string(from: date)
+        return DateFormattingUtility.displayDate(fromUTCISOString: lastLoginUtc)
     }
 
     private var registeredText: String? {
-        guard let registeredUtc = userInfo?.registeredUtc,
-            let date = parseUTCISODate(registeredUtc)
-        else {
+        guard let registeredUtc = userInfo?.registeredUtc else {
             return nil
         }
-        return displayDateFormatter.string(from: date)
+        return DateFormattingUtility.displayDate(fromUTCISOString: registeredUtc)
     }
 
     private var hasDataProtectionSecurityKey: Bool {
         !dataProtectionSecurityKey.isEmpty
-    }
-
-    private var displayDateFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
-    }
-
-    private func parseUTCISODate(_ value: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: value) {
-            return date
-        }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: value)
     }
 
     @ViewBuilder
@@ -463,7 +443,7 @@ struct ContentView: View {
             Text(L10n.s("workspace.title"))
                 .font(.largeTitle)
             Text(L10n.s("workspace.subtitle"))
-            .foregroundStyle(.secondary)
+                .foregroundStyle(.secondary)
         }
     }
 

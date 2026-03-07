@@ -39,16 +39,16 @@ struct LoggedInUserDetailsView: View {
                     Text(
                         String(format: L10n.s("user.lastLogin.format"), lastLoginText)
                     )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 if let registeredText {
                     Text(
                         String(format: L10n.s("user.registered.format"), registeredText)
                     )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Button(action: onDataProtectionTap) {

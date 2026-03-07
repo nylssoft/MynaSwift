@@ -55,7 +55,7 @@ struct ContactsView: View {
     }
 
     private var sortedContactItems: [ContactItem] {
-        contactItems.sorted(by: sortContactsByFirstName)
+        contactItems.sorted(by: sortContactsByName)
     }
 
     private var syncContextID: String {
@@ -132,8 +132,9 @@ struct ContactsView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(
                                     item.name.isEmpty
-                                        ? L10n.s("contacts.noName") : item.name)
-                                    .font(.headline)
+                                        ? L10n.s("contacts.noName") : item.name
+                                )
+                                .font(.headline)
                                 if !item.email.isEmpty || !item.phone.isEmpty
                                     || !item.birthday.isEmpty
                                 {
@@ -231,11 +232,11 @@ struct ContactsView: View {
         defer { isLoadingContacts = false }
 
         do {
-            let items = try await service.getContactItems(
+            let items = try await service.loadContacts(
                 token: token,
                 encryptionKey: dataProtectionSecurityKey,
                 passwordManagerSalt: passwordManagerSalt)
-            contactItems = items.sorted(by: sortContactsByFirstName)
+            contactItems = items.sorted(by: sortContactsByName)
             hasLoadedContacts = true
             updateSelectionAfterReload(preferredSelectedID: preferredSelectedID)
         } catch {
@@ -266,9 +267,9 @@ struct ContactsView: View {
         defer { isUploadingContacts = false }
 
         do {
-            try await service.uploadContactItems(
+            try await service.saveContacts(
                 token: token,
-                contactItems: contactItems,
+                contacts: contactItems,
                 encryptionKey: dataProtectionSecurityKey,
                 passwordManagerSalt: passwordManagerSalt)
         } catch {
@@ -294,7 +295,7 @@ struct ContactsView: View {
             email: "",
             note: "")
         contactItems.append(newContact)
-        contactItems.sort(by: sortContactsByFirstName)
+        contactItems.sort(by: sortContactsByName)
         selectContact(newContact)
         await uploadAndReload(preferredSelectedID: newContact.id)
     }
@@ -382,29 +383,13 @@ struct ContactsView: View {
         contactNoteDraft = ""
     }
 
-    private func sortContactsByFirstName(_ lhs: ContactItem, _ rhs: ContactItem) -> Bool {
-        let lhsKey = firstNameSortKey(from: lhs.name)
-        let rhsKey = firstNameSortKey(from: rhs.name)
-        if lhsKey == rhsKey {
-            let lhsName = lhs.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                .localizedLowercase
-            let rhsName = rhs.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                .localizedLowercase
-            if lhsName == rhsName {
-                return lhs.id < rhs.id
-            }
-            return lhsName < rhsName
+    private func sortContactsByName(_ lhs: ContactItem, _ rhs: ContactItem) -> Bool {
+        let name1 = lhs.name.localizedLowercase
+        let name2 = rhs.name.localizedLowercase
+        if name1 == name2 {
+            return lhs.id < rhs.id
         }
-        return lhsKey < rhsKey
-    }
-
-    private func firstNameSortKey(from fullName: String) -> String {
-        let trimmed = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return ""
-        }
-        let components = trimmed.split(whereSeparator: { $0.isWhitespace })
-        return String(components.first ?? Substring(trimmed)).localizedLowercase
+        return name1 < name2
     }
 }
 
@@ -437,7 +422,8 @@ private struct ContactDetailView: View {
                 .help(
                     isEditing
                         ? L10n.s("contacts.help.saveChanges")
-                        : L10n.s("contacts.help.edit"))
+                        : L10n.s("contacts.help.edit")
+                )
                 .disabled(contact == nil || isBusy)
 
                 Button(role: .destructive, action: onDelete) {
