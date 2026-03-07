@@ -1,6 +1,9 @@
 # MynaSwift
 
-MynaSwift is a macOS SwiftUI client for the Myna backend.
+MynaSwift is a macOS SwiftUI client for the Myna backend on `stockfleth.eu`.
+
+MynaSwift is a personal workspace for managing notes, documents, passwords, contacts, appointments, and diary entries in one secure desktop application.
+The goal of the application is to keep personal information organized while protecting workspace content with a user-defined security key.
 
 ## Status
 
@@ -43,3 +46,9 @@ This implementation is still work in progress. Existing features are usable, but
 - Localization resources are in `Sources/Resources/en.lproj/Localizable.strings` and `Sources/Resources/de.lproj/Localizable.strings`.
 - Package default localization is English.
 - In debug builds, a debug locale menu is available to switch locale override during development.
+
+## Related repositories
+
+- Web client (TypeScript): [TsMynaPortal](https://github.com/nylssoft/TsMynaPortal)
+- Android client (MAUI): [MynaPasswordReaderMAUI](https://github.com/nylssoft/MynaPasswordReaderMAUI)
+- Server backend: [MynaAPIServer](https://github.com/nylssoft/MynaAPIServer)
