@@ -59,6 +59,7 @@ struct ContentView: View {
     @State private var showDataProtectionDialog = false
     @State private var dataProtectionSecurityKey = ""
     @State private var isLoggingOut = false
+    @State private var activityStatusMessage: String?
     @State private var statusBarMessage: String?
     @State private var clearStatusBarTask: Task<Void, Never>?
     @AppStorage("contentView.isUserDetailsCollapsed") private var isUserDetailsCollapsed = false
@@ -217,7 +218,7 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
-                    Text(statusBarMessage ?? L10n.s("status.ready"))
+                    Text(activityStatusMessage ?? statusBarMessage ?? L10n.s("status.ready"))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Spacer(minLength: 0)
@@ -434,7 +435,10 @@ struct ContentView: View {
                 authentication: authentication,
                 passwordManagerSalt: userInfo?.passwordManagerSalt,
                 dataProtectionSecurityKey: dataProtectionSecurityKey,
-                isLoggedIn: isLoggedIn)
+                isLoggedIn: isLoggedIn,
+                onActivityStatusChange: { message in
+                    setActivityStatusBarMessage(message)
+                })
         case .documents:
             SectionSkeletonView(
                 title: L10n.s("section.documents"),
@@ -446,6 +450,9 @@ struct ContentView: View {
                 userInfo: userInfo,
                 dataProtectionSecurityKey: dataProtectionSecurityKey,
                 isLoggedIn: isLoggedIn,
+                onActivityStatusChange: { message in
+                    setActivityStatusBarMessage(message)
+                },
                 onStatusMessage: { message in
                     showStatusBarMessage(message)
                 })
@@ -455,15 +462,27 @@ struct ContentView: View {
                 authentication: authentication,
                 userInfo: userInfo,
                 dataProtectionSecurityKey: dataProtectionSecurityKey,
-                isLoggedIn: isLoggedIn)
+                isLoggedIn: isLoggedIn,
+                onActivityStatusChange: { message in
+                    setActivityStatusBarMessage(message)
+                })
         case .appointments:
             SectionSkeletonView(
                 title: L10n.s("section.appointments"),
                 subtitle: L10n.s("section.appointments.subtitle"))
         case .diaryEntries:
-            SectionSkeletonView(
-                title: L10n.s("section.diaryEntries"),
-                subtitle: L10n.s("section.diaryEntries.subtitle"))
+            DiaryView(
+                service: service,
+                authentication: authentication,
+                userInfo: userInfo,
+                dataProtectionSecurityKey: dataProtectionSecurityKey,
+                isLoggedIn: isLoggedIn,
+                onActivityStatusChange: { message in
+                    setActivityStatusBarMessage(message)
+                },
+                onStatusMessage: { message in
+                    showStatusBarMessage(message)
+                })
         }
     }
 
@@ -489,6 +508,11 @@ struct ContentView: View {
                 statusBarMessage = nil
             }
         }
+    }
+
+    @MainActor
+    private func setActivityStatusBarMessage(_ message: String?) {
+        activityStatusMessage = message
     }
 
 }

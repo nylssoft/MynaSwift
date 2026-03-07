@@ -2,6 +2,7 @@
 "menu.about" = "Über MynaSwift";
 "about.window.title" = "Über MynaSwift";
 "about.version.format" = "Version %@";
+"about.copyright" = "Copyright 2026 Niels Stockfleth";
 "about.description" = "MynaSwift ist ein persönlicher Arbeitsbereich zum Verwalten von Notizen, Dokumenten, Passwörtern, Kontakten, Terminen und Tagebucheinträgen in einer sicheren Desktop-Anwendung.\n\nDas Ziel der Anwendung ist es, persönliche Informationen übersichtlich zu halten und gleichzeitig die Inhalte des Arbeitsbereichs mit einem benutzerdefinierten Sicherheitsschlüssel zu schützen.";
 
 "common.close" = "Schließen";
@@ -154,6 +155,29 @@
 "notes.error.save" = "Notiz konnte nicht gespeichert werden.";
 "notes.error.delete" = "Notiz konnte nicht gelöscht werden.";
 "notes.newTitle" = "Neue Notiz";
+
+"diary.reload" = "Tagebuch neu laden";
+"diary.previousMonth" = "Vorheriger Monat";
+"diary.nextMonth" = "Nächster Monat";
+"diary.loadingDays" = "Tagebuchtage werden geladen...";
+"diary.loadingEntry" = "Tagebucheintrag wird geladen...";
+"diary.saving" = "Tagebucheintrag wird gespeichert...";
+"diary.deleting" = "Tagebucheintrag wird gelöscht...";
+"diary.noDaySelected" = "Kein Tag ausgewählt";
+"diary.selectDayPrompt" = "Wählen Sie einen Tag im Kalender, um den Eintrag anzuzeigen oder zu bearbeiten.";
+"diary.dayHasEntry" = "Tag mit Eintrag";
+"diary.dayNoEntry" = "Tag ohne Eintrag";
+"diary.help.edit" = "Tagebucheintrag bearbeiten";
+"diary.help.saveChanges" = "Änderungen speichern";
+"diary.error.loginRequired" = "Melden Sie sich an, um Tagebucheinträge zu verwenden.";
+"diary.error.notAvailable" = "Tagebuch ist für dieses Konto nicht verfügbar.";
+"diary.error.setKey" = "Setzen Sie Ihren Datenschutzschlüssel, um Tagebucheinträge zu verwalten.";
+"diary.error.loadDays" = "Tagebuchtage konnten nicht geladen werden.";
+"diary.error.loadEntry" = "Tagebucheintrag konnte nicht geladen werden.";
+"diary.error.save" = "Tagebucheintrag konnte nicht gespeichert werden.";
+"diary.error.delete" = "Tagebucheintrag konnte nicht gelöscht werden.";
+"diary.status.saved" = "Tagebucheintrag gespeichert.";
+"diary.status.deleted" = "Tagebucheintrag gelöscht.";
 
 "error.authentication.unexpected" = "Unerwarteter Authentifizierungsfehler.";
 "error.authentication.noPendingRequest" = "Keine ausstehende Authentifizierungsanfrage.";

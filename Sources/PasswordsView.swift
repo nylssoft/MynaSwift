@@ -9,6 +9,7 @@ struct PasswordsView: View {
     let userInfo: UserInfoResponse?
     let dataProtectionSecurityKey: String
     let isLoggedIn: Bool
+    let onActivityStatusChange: (String?) -> Void
     let onStatusMessage: (String) -> Void
 
     @State private var passwordItems: [PasswordItem] = []
@@ -113,15 +114,6 @@ struct PasswordsView: View {
                     .buttonStyle(.plain)
                     .help(L10n.s("passwords.add"))
                     .disabled(isBusy || !canSyncPasswords)
-                }
-
-                if isBusy {
-                    ProgressView(
-                        isUploadingPasswords
-                            ? L10n.s("passwords.uploading")
-                            : L10n.s("passwords.loading")
-                    )
-                    .controlSize(.small)
                 }
 
                 if let passwordsErrorMessage {
@@ -269,8 +261,12 @@ struct PasswordsView: View {
         }
 
         isLoadingPasswords = true
+        onActivityStatusChange(L10n.s("passwords.loading"))
         passwordsErrorMessage = nil
-        defer { isLoadingPasswords = false }
+        defer {
+            isLoadingPasswords = false
+            onActivityStatusChange(nil)
+        }
 
         do {
             let items = try await service.getPasswordItems(
@@ -304,8 +300,12 @@ struct PasswordsView: View {
         }
 
         isUploadingPasswords = true
+        onActivityStatusChange(L10n.s("passwords.uploading"))
         passwordsErrorMessage = nil
-        defer { isUploadingPasswords = false }
+        defer {
+            isUploadingPasswords = false
+            onActivityStatusChange(nil)
+        }
 
         do {
             try await service.savePasswordItems(

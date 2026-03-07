@@ -11,10 +11,13 @@ struct AboutDialogView: View {
             Text(String(format: L10n.s("about.version.format"), appVersion))
                 .foregroundStyle(.secondary)
 
+            Text(L10n.s("about.copyright"))
+                .foregroundStyle(.secondary)
+
             Text(L10n.s("about.description"))
-            .lineLimit(nil)
-            .fixedSize(horizontal: false, vertical: true)
-            .foregroundStyle(.secondary)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(.secondary)
 
             Spacer(minLength: 6)
 

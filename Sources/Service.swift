@@ -111,6 +111,16 @@ struct PasswordItem: Codable, Identifiable {
     }
 }
 
+struct DiaryEntry: Codable {
+    var entry: String
+    var date: String?
+
+    enum CodingKeys: String, CodingKey {
+        case entry = "entry"
+        case date = "date"
+    }
+}
+
 protocol Servicing {
 
     // authentication
@@ -182,6 +192,29 @@ protocol Servicing {
         encryptionKey: String,
         passwordManagerSalt: String
     ) async throws -> String
+
+    // diary
+
+    func getDiaryDays(token: String, year: Int, month: Int) async throws -> [Int]
+
+    func getDiaryEntry(
+        token: String,
+        year: Int,
+        month: Int,
+        day: Int,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> DiaryEntry
+
+    func saveDiaryEntry(
+        token: String,
+        year: Int,
+        month: Int,
+        day: Int,
+        entry: String,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws
 
     // error translations
 
@@ -689,6 +722,68 @@ struct RemoteService: Servicing {
             passwordManagerSalt: passwordManagerSalt)
     }
 
+    // diary
+
+    func getDiaryDays(token: String, year: Int, month: Int) async throws -> [Int] {
+        let dateQuery = try diaryQueryDateString(year: year, month: month, day: 1)
+        let endpointURL = try diaryEndpointURL(path: "/api/diary/day", dateQuery: dateQuery)
+        var request = URLRequest(url: endpointURL)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        return try JSONDecoder().decode([Int].self, from: data)
+    }
+
+    func getDiaryEntry(
+        token: String,
+        year: Int,
+        month: Int,
+        day: Int,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> DiaryEntry {
+        let dateQuery = try diaryQueryDateString(year: year, month: month, day: day)
+        let endpointURL = try diaryEndpointURL(path: "/api/diary/entry", dateQuery: dateQuery)
+        var request = URLRequest(url: endpointURL)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        var diaryEntry = try JSONDecoder().decode(DiaryEntry.self, from: data)
+        diaryEntry.entry = try cryptoService.decryptText(
+            diaryEntry.entry,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+        return diaryEntry
+    }
+
+    func saveDiaryEntry(
+        token: String,
+        year: Int,
+        month: Int,
+        day: Int,
+        entry: String,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws {
+        let dateValue = try diaryQueryDateString(year: year, month: month, day: day)
+        let encryptedEntry = try cryptoService.encryptText(
+            entry,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+        var request = URLRequest(url: URL(string: "/api/diary/entry", relativeTo: baseURL)!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.httpBody = try JSONEncoder().encode(
+            SaveDiaryEntryRequest(date: dateValue, entry: encryptedEntry))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+    }
+
     private func decodeNoteFields(
         _ note: Note,
         encryptionKey: String,
@@ -744,6 +839,50 @@ struct RemoteService: Servicing {
         }
         return lhsName < rhsName
     }
+
+    private func diaryQueryDateString(year: Int, month: Int, day: Int) throws -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = 0
+        components.minute = 0
+        components.second = 0
+        components.nanosecond = 0
+        components.timeZone = .current
+        guard let date = calendar.date(from: components) else {
+            throw ServiceError.invalidURL
+        }
+
+        // Match MAUI exactly: "yyyy-MM-dd'T'HH:mm:ss.fffK" on DateTime with Kind=Unspecified,
+        // which yields no timezone suffix.
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
+        return formatter.string(from: date)
+    }
+
+    private func diaryEndpointURL(path: String, dateQuery: String) throws -> URL {
+        guard let baseURL else {
+            throw ServiceError.invalidURL
+        }
+        guard var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)
+        else {
+            throw ServiceError.invalidURL
+        }
+        components.queryItems = [URLQueryItem(name: "date", value: dateQuery)]
+        guard let url = components.url else {
+            throw ServiceError.invalidURL
+        }
+        #if DEBUG
+            print("[RemoteService] Diary request URL: \(url.absoluteString)")
+        #endif
+        return url
+    }
 }
 
 private struct AuthenticationRequest: Encodable {
@@ -777,6 +916,16 @@ private struct UpdateNoteRequest: Encodable {
         case id = "Id"
         case title = "Title"
         case content = "Content"
+    }
+}
+
+private struct SaveDiaryEntryRequest: Encodable {
+    let date: String
+    let entry: String
+
+    enum CodingKeys: String, CodingKey {
+        case date = "Date"
+        case entry = "Entry"
     }
 }
 

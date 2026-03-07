@@ -6,6 +6,7 @@ struct ContactsView: View {
     let userInfo: UserInfoResponse?
     let dataProtectionSecurityKey: String
     let isLoggedIn: Bool
+    let onActivityStatusChange: (String?) -> Void
 
     @State private var contactItems: [ContactItem] = []
     @State private var isLoadingContacts = false
@@ -102,15 +103,6 @@ struct ContactsView: View {
                     .buttonStyle(.plain)
                     .help(L10n.s("contacts.add"))
                     .disabled(isBusy || !canSyncContacts)
-                }
-
-                if isBusy {
-                    ProgressView(
-                        isUploadingContacts
-                            ? L10n.s("contacts.uploading")
-                            : L10n.s("contacts.loading")
-                    )
-                    .controlSize(.small)
                 }
 
                 if let contactsErrorMessage {
@@ -228,8 +220,12 @@ struct ContactsView: View {
         }
 
         isLoadingContacts = true
+        onActivityStatusChange(L10n.s("contacts.loading"))
         contactsErrorMessage = nil
-        defer { isLoadingContacts = false }
+        defer {
+            isLoadingContacts = false
+            onActivityStatusChange(nil)
+        }
 
         do {
             let items = try await service.loadContacts(
@@ -263,8 +259,12 @@ struct ContactsView: View {
         }
 
         isUploadingContacts = true
+        onActivityStatusChange(L10n.s("contacts.uploading"))
         contactsErrorMessage = nil
-        defer { isUploadingContacts = false }
+        defer {
+            isUploadingContacts = false
+            onActivityStatusChange(nil)
+        }
 
         do {
             try await service.saveContacts(

@@ -6,6 +6,7 @@ struct NotesView: View {
     let passwordManagerSalt: String?
     let dataProtectionSecurityKey: String
     let isLoggedIn: Bool
+    let onActivityStatusChange: (String?) -> Void
 
     @State private var notes: [Note] = []
     @State private var hasLoadedNotes = false
@@ -104,11 +105,6 @@ struct NotesView: View {
                     .disabled(isListBusy || !canManageNotes)
                 }
 
-                if isListBusy {
-                    ProgressView(busyText)
-                        .controlSize(.small)
-                }
-
                 if let notesErrorMessage {
                     Text(notesErrorMessage)
                         .font(.footnote)
@@ -182,19 +178,6 @@ struct NotesView: View {
         }
     }
 
-    private var busyText: String {
-        if isCreatingNote {
-            return L10n.s("notes.creating")
-        }
-        if isSavingNote {
-            return L10n.s("notes.saving")
-        }
-        if isDeletingNote {
-            return L10n.s("notes.deleting")
-        }
-        return L10n.s("notes.loading")
-    }
-
     @MainActor
     private func loadNotes(force: Bool, preferredSelectedID: Int64? = nil) async {
         if isLoadingNotes {
@@ -216,8 +199,12 @@ struct NotesView: View {
         }
 
         isLoadingNotes = true
+        onActivityStatusChange(L10n.s("notes.loading"))
         notesErrorMessage = nil
-        defer { isLoadingNotes = false }
+        defer {
+            isLoadingNotes = false
+            onActivityStatusChange(nil)
+        }
 
         do {
             notes = try await service.getNotes(
@@ -258,7 +245,11 @@ struct NotesView: View {
         }
 
         isLoadingSelectedNote = true
-        defer { isLoadingSelectedNote = false }
+        onActivityStatusChange(L10n.s("notes.loadingDetails"))
+        defer {
+            isLoadingSelectedNote = false
+            onActivityStatusChange(nil)
+        }
 
         do {
             guard let passwordManagerSalt else {
@@ -294,8 +285,12 @@ struct NotesView: View {
         }
 
         isCreatingNote = true
+        onActivityStatusChange(L10n.s("notes.creating"))
         notesErrorMessage = nil
-        defer { isCreatingNote = false }
+        defer {
+            isCreatingNote = false
+            onActivityStatusChange(nil)
+        }
 
         do {
             guard let passwordManagerSalt else {
@@ -343,8 +338,12 @@ struct NotesView: View {
         }
 
         isSavingNote = true
+        onActivityStatusChange(L10n.s("notes.saving"))
         notesErrorMessage = nil
-        defer { isSavingNote = false }
+        defer {
+            isSavingNote = false
+            onActivityStatusChange(nil)
+        }
 
         do {
             guard let passwordManagerSalt else {
@@ -384,8 +383,12 @@ struct NotesView: View {
         }
 
         isDeletingNote = true
+        onActivityStatusChange(L10n.s("notes.deleting"))
         notesErrorMessage = nil
-        defer { isDeletingNote = false }
+        defer {
+            isDeletingNote = false
+            onActivityStatusChange(nil)
+        }
 
         do {
             try await service.deleteNote(token: token, id: selectedNoteID)
@@ -468,11 +471,6 @@ private struct NoteDetailView: View {
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             } else {
-                if isLoadingDetails {
-                    ProgressView(L10n.s("notes.loadingDetails"))
-                        .controlSize(.small)
-                }
-
                 if let lastModifiedText {
                     Text(String(format: L10n.s("notes.lastModified.format"), lastModifiedText))
                         .font(.caption)
