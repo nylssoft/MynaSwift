@@ -811,7 +811,7 @@ struct DocumentsView: View {
         let fileManager = FileManager.default
         guard
             let downloadsDirectory = DownloadDirectoryAccessManager.shared
-                .accessibleDownloadsDirectoryURL(promptIfNeeded: true)
+                .accessibleDownloadsDirectoryURL(promptIfNeeded: false)
         else {
             throw NSError(
                 domain: "MynaSwift",

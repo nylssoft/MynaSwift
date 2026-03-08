@@ -76,6 +76,7 @@
 "user.details.collapse" = "Benutzerdetails einklappen";
 "user.lastLogin.format" = "Letzte Anmeldung: %@";
 "user.registered.format" = "Registriert: %@";
+"user.storage.format" = "Speicher: %@";
 "user.dataProtectionKey.set" = "Datenschutzschlüssel: gesetzt";
 "user.dataProtectionKey.notSet" = "Datenschutzschlüssel: nicht gesetzt";
 "user.logout" = "Abmelden";

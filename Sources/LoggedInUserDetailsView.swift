@@ -5,7 +5,7 @@ struct LoggedInUserDetailsView: View {
     let email: String?
     let profileImageURL: URL?
     let lastLoginText: String?
-    let registeredText: String?
+    let storageText: String?
     let hasDataProtectionSecurityKey: Bool
     let isLoggingOut: Bool
     let onDataProtectionTap: () -> Void
@@ -43,9 +43,9 @@ struct LoggedInUserDetailsView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                if let registeredText {
+                if let storageText {
                     Text(
-                        String(format: L10n.s("user.registered.format"), registeredText)
+                        String(format: L10n.s("user.storage.format"), storageText)
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)

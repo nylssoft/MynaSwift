@@ -92,7 +92,7 @@ struct ContentView: View {
                 VStack(spacing: 8) {
                     ForEach(WorkspaceSection.allCases) { section in
                         Button {
-                            selectedSection = section
+                            selectSection(section)
                         } label: {
                             Image(systemName: section.iconName)
                                 .font(.system(size: 16, weight: .semibold))
@@ -171,7 +171,7 @@ struct ContentView: View {
                                             email: userInfo?.email,
                                             profileImageURL: profileImageURL,
                                             lastLoginText: lastLoginText,
-                                            registeredText: registeredText,
+                                            storageText: storageText,
                                             hasDataProtectionSecurityKey: hasDataProtectionSecurityKey,
                                             isLoggingOut: isLoggingOut,
                                             onDataProtectionTap: {
@@ -357,6 +357,14 @@ struct ContentView: View {
         }
     }
 
+    private func selectSection(_ section: WorkspaceSection) {
+        selectedSection = section
+        guard isLoggedIn, section == .documents else {
+            return
+        }
+        DownloadDirectoryAccessManager.shared.ensureAccessForDocumentsTab()
+    }
+
     private func saveDataProtectionSecurityKey(_ securityKey: String) {
         guard isLoggedIn,
             let userID = userInfo?.id,
@@ -415,11 +423,26 @@ struct ContentView: View {
         return DateFormattingUtility.displayDate(fromUTCISOString: lastLoginUtc)
     }
 
-    private var registeredText: String? {
-        guard let registeredUtc = userInfo?.registeredUtc else {
+    private var storageText: String? {
+        guard let userInfo else {
             return nil
         }
-        return DateFormattingUtility.displayDate(fromUTCISOString: registeredUtc)
+        let usedStorage = formatStorageSize(userInfo.usedStorage)
+        let storageQuota = formatStorageSize(userInfo.storageQuota)
+        return "\(usedStorage) / \(storageQuota)"
+    }
+
+    // Keep this aligned with TsMynaPortal DocumentService.formatSize for parity.
+    private func formatStorageSize(_ count: Int64) -> String {
+        let clampedCount = max(0, count)
+        let mb = 1024 * 1024
+        if clampedCount >= Int64(mb) {
+            return "\(clampedCount / Int64(mb)) MB"
+        }
+        if clampedCount >= 1024 {
+            return "\(clampedCount / 1024) KB"
+        }
+        return "\(clampedCount) B"
     }
 
     private var hasDataProtectionSecurityKey: Bool {

@@ -10,7 +10,7 @@ final class DownloadDirectoryAccessManager {
 
     private init() {}
 
-    func ensureAccessOnStartup() {
+    func ensureAccessForDocumentsTab() {
         _ = accessibleDownloadsDirectoryURL(promptIfNeeded: true)
     }
 

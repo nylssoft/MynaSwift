@@ -76,6 +76,7 @@
 "user.details.collapse" = "Collapse user details";
 "user.lastLogin.format" = "Last login: %@";
 "user.registered.format" = "Registered: %@";
+"user.storage.format" = "Storage: %@";
 "user.dataProtectionKey.set" = "Data protection key: Set";
 "user.dataProtectionKey.notSet" = "Data protection key: Not set";
 "user.logout" = "Log out";
