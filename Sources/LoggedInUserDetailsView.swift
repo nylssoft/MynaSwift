@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct LoggedInUserDetailsView: View {
+    private let securitySettingsURL = URL(string: "https://www.stockfleth.eu")
+
     let displayName: String
     let email: String?
     let profileImageURL: URL?
@@ -65,6 +67,11 @@ struct LoggedInUserDetailsView: View {
                     .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+
+                if let securitySettingsURL {
+                    Link(L10n.s("user.securitySettings.link"), destination: securitySettingsURL)
+                        .font(.caption)
+                }
 
                 Button(L10n.s("user.logout"), action: onLogoutTap)
                     .font(.caption)
