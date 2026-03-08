@@ -189,6 +189,7 @@
 "documents.moving" = "Moving items...";
 "documents.download" = "Download";
 "documents.detail.title" = "Document Details";
+"documents.preview.unavailable" = "No local preview available. Download this document to generate a thumbnail.";
 "documents.selectPrompt" = "Select a document or folder.";
 "documents.field.name" = "Name";
 "documents.field.type" = "Type";

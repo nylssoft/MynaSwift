@@ -1,4 +1,5 @@
 import AppKit
+import QuickLookThumbnailing
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -39,6 +40,8 @@ struct DocumentsView: View {
     @State private var folderNameDraft = ""
     @State private var renameNameDraft = ""
     @State private var renameTargetID: Int64?
+    @State private var thumbnailImage: NSImage?
+    @State private var isLoadingThumbnail = false
 
     private var token: String? {
         authentication?.token
@@ -100,6 +103,10 @@ struct DocumentsView: View {
 
     private var syncContextID: String {
         "\(isLoggedIn)|\(token ?? "")|\(passwordManagerSalt ?? "")"
+    }
+
+    private var thumbnailContextID: String {
+        "\(selectedItemID ?? -1)|\(selectedItem?.name ?? "")"
     }
 
     private var canNavigateUp: Bool {
@@ -292,6 +299,13 @@ struct DocumentsView: View {
                     .fontWeight(.semibold)
 
                 if let selected = selectedItem {
+                    if selected.type == DocumentType.document.rawValue {
+                        DocumentThumbnailView(
+                            thumbnailImage: thumbnailImage,
+                            isLoading: isLoadingThumbnail,
+                            fallbackSymbolName: documentSymbolName(for: selected.name))
+                    }
+
                     HStack {
                         Text(selected.name)
                             .font(.headline)
@@ -395,6 +409,9 @@ struct DocumentsView: View {
             hasLoadedItems = false
             clearSelection()
             await loadDocumentItems(force: true, currentID: nil)
+        }
+        .task(id: thumbnailContextID) {
+            await refreshThumbnailForSelection()
         }
     }
 
@@ -891,6 +908,110 @@ struct DocumentsView: View {
         }
     }
 
+    @MainActor
+    private func refreshThumbnailForSelection() async {
+        guard let selected = selectedItem,
+            selected.type == DocumentType.document.rawValue
+        else {
+            thumbnailImage = nil
+            isLoadingThumbnail = false
+            return
+        }
+
+        guard let localFileURL = resolveDownloadedFileURL(for: selected.name) else {
+            thumbnailImage = nil
+            isLoadingThumbnail = false
+            return
+        }
+
+        isLoadingThumbnail = true
+        defer {
+            isLoadingThumbnail = false
+        }
+
+        if let thumbnail = await generateThumbnail(for: localFileURL, maxSize: CGSize(width: 240, height: 180)) {
+            thumbnailImage = thumbnail
+        } else {
+            thumbnailImage = NSWorkspace.shared.icon(forFile: localFileURL.path)
+        }
+    }
+
+    private func generateThumbnail(for fileURL: URL, maxSize: CGSize) async -> NSImage? {
+        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
+        let request = QLThumbnailGenerator.Request(
+            fileAt: fileURL,
+            size: maxSize,
+            scale: scale,
+            representationTypes: .all)
+
+        return await withCheckedContinuation { continuation in
+            QLThumbnailGenerator.shared.generateBestRepresentation(for: request) {
+                representation,
+                _ in
+                guard let cgImage = representation?.cgImage else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: NSImage(cgImage: cgImage, size: maxSize))
+            }
+        }
+    }
+
+    private func resolveDownloadedFileURL(for fileName: String) -> URL? {
+        let fileManager = FileManager.default
+        guard let downloadsDirectory = fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        else {
+            return nil
+        }
+        guard let fileURLs = try? fileManager.contentsOfDirectory(
+            at: downloadsDirectory,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles])
+        else {
+            return nil
+        }
+
+        let ext = URL(fileURLWithPath: fileName).pathExtension
+        let baseName: String
+        if ext.isEmpty {
+            baseName = fileName
+        } else {
+            baseName = String(fileName.dropLast(ext.count + 1))
+        }
+
+        let candidates = fileURLs.filter { url in
+            let candidateName = url.lastPathComponent
+            if candidateName == fileName {
+                return true
+            }
+            if ext.isEmpty {
+                guard candidateName.hasPrefix("\(baseName) ") else {
+                    return false
+                }
+                let suffix = String(candidateName.dropFirst(baseName.count + 1))
+                return Int(suffix) != nil
+            }
+            let suffix = ".\(ext)"
+            guard candidateName.hasPrefix("\(baseName) "),
+                candidateName.hasSuffix(suffix)
+            else {
+                return false
+            }
+            let numberPart = candidateName
+                .dropFirst(baseName.count + 1)
+                .dropLast(suffix.count)
+            return Int(numberPart) != nil
+        }
+
+        return candidates.max { lhs, rhs in
+            let leftDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? .distantPast
+            let rightDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? .distantPast
+            return leftDate < rightDate
+        }
+    }
+
     private func clearSelection() {
         selectedItemID = nil
         selectedItemIDs.removeAll()
@@ -987,6 +1108,41 @@ struct DocumentsView: View {
             documentsErrorMessage =
                 (error as? LocalizedError)?.errorDescription ?? L10n.s("documents.error.move")
         }
+    }
+}
+
+private struct DocumentThumbnailView: View {
+    let thumbnailImage: NSImage?
+    let isLoading: Bool
+    let fallbackSymbolName: String
+
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 180)
+            } else if let thumbnailImage {
+                Image(nsImage: thumbnailImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 180)
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: fallbackSymbolName)
+                        .font(.system(size: 32))
+                        .foregroundStyle(.secondary)
+                    Text(L10n.s("documents.preview.unavailable"))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 180)
+            }
+        }
+        .background(.quaternary.opacity(0.2))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

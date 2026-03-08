@@ -189,6 +189,7 @@
 "documents.moving" = "Elemente werden verschoben...";
 "documents.download" = "Herunterladen";
 "documents.detail.title" = "Dokumentdetails";
+"documents.preview.unavailable" = "Keine lokale Vorschau verfügbar. Laden Sie dieses Dokument herunter, um ein Vorschaubild zu erzeugen.";
 "documents.selectPrompt" = "Wählen Sie ein Dokument oder einen Ordner.";
 "documents.field.name" = "Name";
 "documents.field.type" = "Typ";
