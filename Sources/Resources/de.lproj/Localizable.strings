@@ -4,6 +4,7 @@
 "about.version.format" = "Version %@";
 "about.copyright" = "Copyright 2026 Niels Stockfleth";
 "about.description" = "MynaSwift ist ein persönlicher Arbeitsbereich zum Verwalten von Notizen, Dokumenten, Passwörtern, Kontakten, Terminen und Tagebucheinträgen in einer sicheren Desktop-Anwendung.\n\nDas Ziel der Anwendung ist es, persönliche Informationen übersichtlich zu halten und gleichzeitig die Inhalte des Arbeitsbereichs mit einem benutzerdefinierten Sicherheitsschlüssel zu schützen.";
+"about.repository.link" = "Quellcode auf GitHub ansehen";
 
 "common.close" = "Schließen";
 "common.cancel" = "Abbrechen";
@@ -79,11 +80,16 @@
 "user.storage.format" = "Speicher: %@";
 "user.dataProtectionKey.set" = "Datenschutzschlüssel: gesetzt";
 "user.dataProtectionKey.notSet" = "Datenschutzschlüssel: nicht gesetzt";
+"user.securitySettings.link" = "Sicherheitseinstellungen auf www.stockfleth.eu verwalten";
 "user.logout" = "Abmelden";
+"user.logout.confirm.title" = "Abmelden?";
+"user.logout.confirm.message" = "Möchten Sie sich wirklich abmelden?";
 "user.loggedIn" = "Angemeldet";
 
 "dataProtection.title" = "Datenschutz";
 "dataProtection.description" = "Geben Sie den Sicherheitsschlüssel ein, der zum Ver- und Entschlüsseln persönlicher Arbeitsbereichsdaten verwendet wird.";
+"dataProtection.warning.title" = "Wichtig: Schlüssel sicher aufbewahren";
+"dataProtection.warning.message" = "Bewahren Sie diesen Schlüssel getrennt auf oder drucken Sie ihn aus und verwahren Sie ihn an einem sicheren Ort. Wenn der Schlüssel verloren geht, können die verschlüsselten Daten nicht wiederhergestellt werden.";
 "dataProtection.securityKey" = "Sicherheitsschlüssel";
 "dataProtection.hideSecurityKey" = "Sicherheitsschlüssel ausblenden";
 "dataProtection.showSecurityKey" = "Sicherheitsschlüssel anzeigen";
@@ -95,6 +101,7 @@
 "login.secondFactorCode" = "Zweiter Faktor Code";
 "login.complete2fa" = "2FA abschließen";
 "login.signIn" = "Anmelden";
+"login.registerIfNoAccount" = "Konto erstellen oder Passwort zurücksetzen? www.stockfleth.eu öffnen.";
 "login.progress.completing2fa" = "2FA wird abgeschlossen...";
 "login.progress.signingIn" = "Anmeldung läuft...";
 

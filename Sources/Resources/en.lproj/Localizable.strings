@@ -4,6 +4,7 @@
 "about.version.format" = "Version %@";
 "about.copyright" = "Copyright 2026 Niels Stockfleth";
 "about.description" = "MynaSwift is a personal workspace for managing notes, documents, passwords, contacts, appointments, and diary entries in one secure desktop application.\n\nThe goal of the application is to keep personal information organized while protecting workspace content with a user-defined security key.";
+"about.repository.link" = "View source code on GitHub";
 
 "common.close" = "Close";
 "common.cancel" = "Cancel";
@@ -79,11 +80,16 @@
 "user.storage.format" = "Storage: %@";
 "user.dataProtectionKey.set" = "Data protection key: Set";
 "user.dataProtectionKey.notSet" = "Data protection key: Not set";
+"user.securitySettings.link" = "Manage security settings at www.stockfleth.eu";
 "user.logout" = "Log out";
+"user.logout.confirm.title" = "Log out?";
+"user.logout.confirm.message" = "Do you really want to log out?";
 "user.loggedIn" = "Logged in";
 
 "dataProtection.title" = "Data Protection";
 "dataProtection.description" = "Enter the security key used to encrypt and decrypt personal workspace data.";
+"dataProtection.warning.title" = "Important: Store this key safely";
+"dataProtection.warning.message" = "Store this key separately or print it and keep it in a secure place. If this key is lost, your encrypted data cannot be recovered.";
 "dataProtection.securityKey" = "Security key";
 "dataProtection.hideSecurityKey" = "Hide security key";
 "dataProtection.showSecurityKey" = "Show security key";
@@ -95,6 +101,7 @@
 "login.secondFactorCode" = "Second factor code";
 "login.complete2fa" = "Complete 2FA";
 "login.signIn" = "Sign In";
+"login.registerIfNoAccount" = "Need an account or password reset? Open www.stockfleth.eu.";
 "login.progress.completing2fa" = "Completing 2FA...";
 "login.progress.signingIn" = "Signing in...";
 

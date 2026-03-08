@@ -59,6 +59,7 @@ struct ContentView: View {
     @State private var showDataProtectionDialog = false
     @State private var dataProtectionSecurityKey = ""
     @State private var isLoggingOut = false
+    @State private var showLogoutConfirmation = false
     @State private var activityStatusMessage: String?
     @State private var statusBarMessage: String?
     @State private var clearStatusBarTask: Task<Void, Never>?
@@ -178,9 +179,7 @@ struct ContentView: View {
                                                 showDataProtectionDialog = true
                                             },
                                             onLogoutTap: {
-                                                Task {
-                                                    await logoutCurrentUser()
-                                                }
+                                                showLogoutConfirmation = true
                                             })
                                     }
                                 }
@@ -260,6 +259,16 @@ struct ContentView: View {
                 onSave: { securityKey in
                     saveDataProtectionSecurityKey(securityKey)
                 })
+        }
+        .alert(L10n.s("user.logout.confirm.title"), isPresented: $showLogoutConfirmation) {
+            Button(L10n.s("common.cancel"), role: .cancel) {}
+            Button(L10n.s("user.logout"), role: .destructive) {
+                Task {
+                    await logoutCurrentUser()
+                }
+            }
+        } message: {
+            Text(L10n.s("user.logout.confirm.message"))
         }
         .task(id: translationTaskID) {
             await initializeTranslationsOnStartup()
