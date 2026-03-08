@@ -141,6 +141,39 @@ struct DiaryEntry: Codable {
     }
 }
 
+struct AppointmentResponse: Codable, Identifiable {
+    var id: String { uuid }
+    let uuid: String
+    let createdUtc: String?
+    let modifiedUtc: String?
+    var ownerKey: String?
+    var definition: AppointmentDefinition?
+    var votes: [AppointmentVote]?
+    var accessToken: String?
+}
+
+struct AppointmentDefinition: Codable {
+    var description: String
+    var options: [AppointmentOption]
+    var participants: [AppointmentParticipant]
+}
+
+struct AppointmentParticipant: Codable, Hashable {
+    var userUuid: String
+    var username: String
+}
+
+struct AppointmentOption: Codable, Hashable {
+    var year: Int
+    var month: Int
+    var days: [Int]
+}
+
+struct AppointmentVote: Codable {
+    var userUuid: String
+    var accepted: [AppointmentOption]
+}
+
 protocol Servicing {
 
     // authentication
@@ -265,6 +298,32 @@ protocol Servicing {
         encryptionKey: String,
         passwordManagerSalt: String
     ) async throws
+
+    // appointments
+
+    func getAppointments(token: String, encryptionKey: String, passwordManagerSalt: String)
+        async throws -> [AppointmentResponse]
+
+    func createAppointment(
+        token: String,
+        description: String,
+        participants: [String],
+        options: [Date],
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> String
+
+    func updateAppointment(
+        token: String,
+        appointment: AppointmentResponse,
+        description: String,
+        participants: [String],
+        options: [Date]
+    ) async throws
+
+    func deleteAppointment(token: String, uuid: String) async throws
+
+    func buildAppointmentVoteURL(accessToken: String) -> URL?
 
     // error translations
 
@@ -619,6 +678,166 @@ struct RemoteService: Servicing {
         try checkResponse(response, data: data)
     }
 
+    // appointments
+
+    func getAppointments(token: String, encryptionKey: String, passwordManagerSalt: String)
+        async throws -> [AppointmentResponse]
+    {
+        var request = URLRequest(url: URL(string: "/api/appointment", relativeTo: baseURL)!)
+        request.httpMethod = "GET"
+        request.setValue(token, forHTTPHeaderField: "token")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        var appointments = try JSONDecoder().decode([AppointmentResponse].self, from: data)
+        guard !appointments.isEmpty else {
+            return []
+        }
+
+        var batch: [AppointmentBatchRequest] = []
+        for idx in appointments.indices {
+            guard let ownerKey = appointments[idx].ownerKey,
+                !ownerKey.isEmpty
+            else {
+                continue
+            }
+            let accessToken = try cryptoService.decryptText(
+                ownerKey,
+                encryptionKey: encryptionKey,
+                passwordManagerSalt: passwordManagerSalt)
+            appointments[idx].accessToken = accessToken
+            batch.append(
+                AppointmentBatchRequest(
+                    method: "GET",
+                    uuid: appointments[idx].uuid,
+                    accessToken: accessToken))
+        }
+
+        var batchRequest = URLRequest(url: URL(string: "/api/appointment/batch", relativeTo: baseURL)!)
+        batchRequest.httpMethod = "POST"
+        batchRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        batchRequest.setValue(token, forHTTPHeaderField: "token")
+        batchRequest.httpBody = try JSONEncoder().encode(batch)
+        let (batchData, batchResponse) = try await URLSession.shared.data(for: batchRequest)
+        try checkResponse(batchResponse, data: batchData)
+        var detailed = try JSONDecoder().decode([AppointmentResponse].self, from: batchData)
+
+        let tokenByUUID = Dictionary(uniqueKeysWithValues: appointments.map { ($0.uuid, $0.accessToken) })
+        for idx in detailed.indices {
+            detailed[idx].accessToken = tokenByUUID[detailed[idx].uuid] ?? detailed[idx].accessToken
+        }
+        return detailed
+    }
+
+    func createAppointment(
+        token: String,
+        description: String,
+        participants: [String],
+        options: [Date],
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> String {
+        let uuid = UUID().uuidString.lowercased()
+
+        var tokenRequest = URLRequest(
+            url: URL(string: "/api/appointment/\(uuid)/accesstoken", relativeTo: baseURL)!)
+        tokenRequest.httpMethod = "GET"
+        tokenRequest.setValue(token, forHTTPHeaderField: "token")
+        let (tokenData, tokenResponse) = try await URLSession.shared.data(for: tokenRequest)
+        try checkResponse(tokenResponse, data: tokenData)
+        let accessToken = try JSONDecoder().decode(String.self, from: tokenData)
+
+        let ownerKey = try cryptoService.encryptText(
+            accessToken,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+
+        let participantPayload = participants.sorted().map {
+            AppointmentUpdateParticipant(userUuid: UUID().uuidString.lowercased(), username: $0)
+        }
+        let optionsPayload = buildAppointmentUpdateOptions(from: options)
+        let definition = AppointmentUpdateDefinition(
+            description: description,
+            options: optionsPayload,
+            participants: participantPayload)
+        let payload = CreateAppointmentRequest(ownerKey: ownerKey, definition: definition)
+
+        var request = URLRequest(url: URL(string: "/api/appointment/\(uuid)", relativeTo: baseURL)!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.setValue(accessToken, forHTTPHeaderField: "accesstoken")
+        request.httpBody = try JSONEncoder().encode(payload)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        return uuid
+    }
+
+    func updateAppointment(
+        token: String,
+        appointment: AppointmentResponse,
+        description: String,
+        participants: [String],
+        options: [Date]
+    ) async throws {
+        guard let accessToken = appointment.accessToken,
+            !accessToken.isEmpty
+        else {
+            throw ServiceError.serverError("Missing appointment access token")
+        }
+
+        let existingByName = Dictionary(
+            uniqueKeysWithValues: (appointment.definition?.participants ?? []).map {
+                ($0.username, $0.userUuid)
+            })
+        let participantPayload = participants.sorted().map {
+            AppointmentUpdateParticipant(
+                userUuid: existingByName[$0] ?? UUID().uuidString.lowercased(),
+                username: $0)
+        }
+        let definition = AppointmentUpdateDefinition(
+            description: description,
+            options: buildAppointmentUpdateOptions(from: options),
+            participants: participantPayload)
+
+        var request = URLRequest(
+            url: URL(string: "/api/appointment/\(appointment.uuid)", relativeTo: baseURL)!)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.setValue(accessToken, forHTTPHeaderField: "accesstoken")
+        request.httpBody = try JSONEncoder().encode(definition)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+    }
+
+    func deleteAppointment(token: String, uuid: String) async throws {
+        var request = URLRequest(url: URL(string: "/api/appointment/\(uuid)", relativeTo: baseURL)!)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+    }
+
+    func buildAppointmentVoteURL(accessToken: String) -> URL? {
+        guard !accessToken.isEmpty else {
+            return nil
+        }
+        let base64 = Data(accessToken.utf8).base64EncodedString()
+        let allowed = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "+/="))
+        guard let encoded = base64.addingPercentEncoding(withAllowedCharacters: allowed) else {
+            return nil
+        }
+        let root = (baseURL ?? URL(string: "https://www.stockfleth.eu"))?.absoluteURL
+        guard let root else {
+            return nil
+        }
+        var components = URLComponents(url: root, resolvingAgainstBaseURL: false)
+        components?.path = "/desktop"
+        components?.queryItems = [URLQueryItem(name: "vid", value: encoded)]
+        return components?.url
+    }
+
     func updateNote(
         token: String,
         id: Int64,
@@ -970,6 +1189,45 @@ struct RemoteService: Servicing {
         return decoded
     }
 
+    private func buildAppointmentUpdateOptions(from dates: [Date]) -> [AppointmentUpdateOption] {
+        let calendar = Calendar(identifier: .gregorian)
+        var map: [String: Set<Int>] = [:]
+
+        for date in dates {
+            let components = calendar.dateComponents([.year, .month, .day], from: date)
+            guard let year = components.year,
+                let month = components.month,
+                let day = components.day
+            else {
+                continue
+            }
+            let key = "\(year)-\(month)"
+            var set = map[key] ?? []
+            set.insert(day)
+            map[key] = set
+        }
+
+        return map.compactMap { key, daysSet in
+            let parts = key.split(separator: "-")
+            guard parts.count == 2,
+                let year = Int(parts[0]),
+                let month = Int(parts[1])
+            else {
+                return nil
+            }
+            return AppointmentUpdateOption(
+                year: year,
+                month: month,
+                days: daysSet.sorted())
+        }
+        .sorted { lhs, rhs in
+            if lhs.year == rhs.year {
+                return lhs.month < rhs.month
+            }
+            return lhs.year < rhs.year
+        }
+    }
+
     private func checkResponse(_ response: URLResponse, data: Data) throws {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw ServiceError.networkError
@@ -1117,6 +1375,62 @@ private struct SaveDiaryEntryRequest: Encodable {
     enum CodingKeys: String, CodingKey {
         case date = "Date"
         case entry = "Entry"
+    }
+}
+
+private struct AppointmentBatchRequest: Encodable {
+    let method: String
+    let uuid: String
+    let accessToken: String
+
+    enum CodingKeys: String, CodingKey {
+        case method = "Method"
+        case uuid = "Uuid"
+        case accessToken
+    }
+}
+
+private struct CreateAppointmentRequest: Encodable {
+    let ownerKey: String
+    let definition: AppointmentUpdateDefinition
+
+    enum CodingKeys: String, CodingKey {
+        case ownerKey = "OwnerKey"
+        case definition = "Definition"
+    }
+}
+
+private struct AppointmentUpdateDefinition: Encodable {
+    let description: String
+    let options: [AppointmentUpdateOption]
+    let participants: [AppointmentUpdateParticipant]
+
+    enum CodingKeys: String, CodingKey {
+        case description = "Description"
+        case options = "Options"
+        case participants = "Participants"
+    }
+}
+
+private struct AppointmentUpdateOption: Encodable {
+    let year: Int
+    let month: Int
+    let days: [Int]
+
+    enum CodingKeys: String, CodingKey {
+        case year = "Year"
+        case month = "Month"
+        case days = "Days"
+    }
+}
+
+private struct AppointmentUpdateParticipant: Encodable {
+    let userUuid: String
+    let username: String
+
+    enum CodingKeys: String, CodingKey {
+        case userUuid = "UserUuid"
+        case username = "Username"
     }
 }
 

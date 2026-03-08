@@ -476,9 +476,18 @@ struct ContentView: View {
                     setActivityStatusBarMessage(message)
                 })
         case .appointments:
-            SectionSkeletonView(
-                title: L10n.s("section.appointments"),
-                subtitle: L10n.s("section.appointments.subtitle"))
+            AppointmentsView(
+                service: service,
+                authentication: authentication,
+                userInfo: userInfo,
+                dataProtectionSecurityKey: dataProtectionSecurityKey,
+                isLoggedIn: isLoggedIn,
+                onActivityStatusChange: { message in
+                    setActivityStatusBarMessage(message)
+                },
+                onStatusMessage: { message in
+                    showStatusBarMessage(message)
+                })
         case .diaryEntries:
             DiaryView(
                 service: service,
