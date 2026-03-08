@@ -21,6 +21,8 @@ struct LoginDialogView: View {
     @State private var keepLogin = AuthSessionStore.shared.keepLoginEnabled
     @FocusState private var focusedField: Field?
 
+    private let registrationURL = URL(string: "https://www.stockfleth.eu")
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(L10n.s("login.title"))
@@ -41,6 +43,13 @@ struct LoginDialogView: View {
                 .onChange(of: keepLogin) { _, newValue in
                     AuthSessionStore.shared.setKeepLoginEnabled(newValue)
                 }
+
+            if !isAwaitingSecondFactor,
+                let registrationURL
+            {
+                Link(L10n.s("login.registerIfNoAccount"), destination: registrationURL)
+                    .font(.caption)
+            }
 
             if isAwaitingSecondFactor {
                 TextField(L10n.s("login.secondFactorCode"), text: $secondFactorCode)
@@ -104,7 +113,7 @@ struct LoginDialogView: View {
             }
         }
         .padding(20)
-        .frame(width: 360)
+        .frame(width: 420)
         .onChange(of: isAwaitingSecondFactor) { _, newValue in
             if newValue {
                 DispatchQueue.main.async {
