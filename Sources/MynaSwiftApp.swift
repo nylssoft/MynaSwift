@@ -6,6 +6,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.applicationIconImage = AppIconFactory.makeAppIcon()
         NSApp.activate(ignoringOtherApps: true)
+
+        Task { @MainActor in
+            DownloadDirectoryAccessManager.shared.ensureAccessOnStartup()
+        }
     }
 }
 

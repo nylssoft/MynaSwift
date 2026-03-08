@@ -11,6 +11,13 @@ struct DocumentsView: View {
     }
 
     private static let maxUploadBytes = 20 * 1024 * 1024
+    private static let appDownloadDirectoryName = "MynaSwift"
+
+    private enum ExistingDownloadChoice {
+        case overwrite
+        case openExisting
+        case cancel
+    }
 
     let service: Servicing
     let authentication: AuthenticationResponse?
@@ -327,6 +334,28 @@ struct DocumentsView: View {
                     DetailRow(label: L10n.s("documents.field.type"), value: selected.type)
                     if selected.type == DocumentType.document.rawValue {
                         DetailRow(label: L10n.s("documents.field.size"), value: formattedFileSize(selected.size))
+                        if let localFileURL = resolveDownloadedFileURL(for: selected) {
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                Text(L10n.s("documents.field.localFile"))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 110, alignment: .leading)
+                                Text(localFileURL.path)
+                                    .textSelection(.enabled)
+                                    .lineLimit(2)
+                                Button {
+                                    revealInFinder(localFileURL)
+                                    onStatusMessage(
+                                        String(
+                                            format: L10n.s("documents.status.revealedInFinder.format"),
+                                            localFileURL.lastPathComponent))
+                                } label: {
+                                    Image(systemName: "folder")
+                                }
+                                .buttonStyle(.plain)
+                                .help(L10n.s("documents.showInFinder"))
+                                Spacer(minLength: 0)
+                            }
+                        }
                         HStack(spacing: 10) {
                             Button {
                                 Task {
@@ -744,61 +773,111 @@ struct DocumentsView: View {
         }
 
         do {
+            let destinationURL = try ensureAppDownloadDirectory().appendingPathComponent(
+                localDownloadFileName(for: item))
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                switch promptForExistingDownload(at: destinationURL) {
+                case .overwrite:
+                    break
+                case .openExisting:
+                    openDocument(destinationURL)
+                    return
+                case .cancel:
+                    return
+                }
+            }
+
             let fileData = try await service.downloadDocument(
                 token: token,
                 id: item.id,
                 encryptionKey: dataProtectionSecurityKey,
                 passwordManagerSalt: passwordManagerSalt)
-            let destinationURL = preferredDownloadURL(for: item.name)
             try fileData.write(to: destinationURL, options: .atomic)
 
             _ = guessedMimeType(for: item.name)
             openDocument(destinationURL)
 
-            onStatusMessage(String(format: L10n.s("documents.status.downloaded.format"), item.name))
+            onStatusMessage(
+                String(
+                    format: L10n.s("documents.status.downloadLocation.format"),
+                    destinationURL.lastPathComponent,
+                    destinationURL.path))
         } catch {
             documentsErrorMessage = (error as? LocalizedError)?.errorDescription ?? L10n.s("documents.error.download")
         }
     }
 
-    private func preferredDownloadURL(for fileName: String) -> URL {
+    private func ensureAppDownloadDirectory() throws -> URL {
         let fileManager = FileManager.default
-        let downloadsDirectory =
-            fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-            .appendingPathComponent("Downloads", isDirectory: true)
+        guard
+            let downloadsDirectory = DownloadDirectoryAccessManager.shared
+                .accessibleDownloadsDirectoryURL(promptIfNeeded: true)
+        else {
+            throw NSError(
+                domain: "MynaSwift",
+                code: 1,
+                userInfo: [
+                    NSLocalizedDescriptionKey: L10n.s("documents.error.downloadDirectoryPermission")
+                ])
+        }
+        let appDownloadsDirectory = downloadsDirectory.appendingPathComponent(
+            Self.appDownloadDirectoryName,
+            isDirectory: true)
 
-        let sanitizedName =
-            fileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "download"
-            : fileName
+        if !fileManager.fileExists(atPath: appDownloadsDirectory.path) {
+            try fileManager.createDirectory(
+                at: appDownloadsDirectory,
+                withIntermediateDirectories: true)
+        }
+        return appDownloadsDirectory
+    }
 
-        let ext = URL(fileURLWithPath: sanitizedName).pathExtension
+    private func localDownloadFileName(for item: DocumentItem) -> String {
+        let originalName = item.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackName = "document"
+        let resolvedName = originalName.isEmpty ? fallbackName : originalName
+
+        let ext = URL(fileURLWithPath: resolvedName).pathExtension
         let baseName: String
         if ext.isEmpty {
-            baseName = sanitizedName
+            baseName = resolvedName
         } else {
-            baseName = String(sanitizedName.dropLast(ext.count + 1))
+            baseName = String(resolvedName.dropLast(ext.count + 1))
         }
+        let safeBaseName = baseName
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedBaseName = safeBaseName.isEmpty ? fallbackName : safeBaseName
 
-        var candidateURL = downloadsDirectory.appendingPathComponent(sanitizedName)
-        if !fileManager.fileExists(atPath: candidateURL.path) {
-            return candidateURL
+        if ext.isEmpty {
+            return "\(resolvedBaseName)-\(item.id)"
         }
+        return "\(resolvedBaseName)-\(item.id).\(ext)"
+    }
 
-        var counter = 2
-        while true {
-            let numberedName: String
-            if ext.isEmpty {
-                numberedName = "\(baseName) \(counter)"
-            } else {
-                numberedName = "\(baseName) \(counter).\(ext)"
-            }
-            candidateURL = downloadsDirectory.appendingPathComponent(numberedName)
-            if !fileManager.fileExists(atPath: candidateURL.path) {
-                return candidateURL
-            }
-            counter += 1
+    private func promptForExistingDownload(at fileURL: URL) -> ExistingDownloadChoice {
+        let alert = NSAlert()
+        alert.messageText = L10n.s("documents.downloadExists.title")
+        alert.informativeText = String(
+            format: L10n.s("documents.downloadExists.message.format"),
+            fileURL.lastPathComponent)
+        alert.addButton(withTitle: L10n.s("documents.downloadExists.overwrite"))
+        alert.addButton(withTitle: L10n.s("documents.downloadExists.openExisting"))
+        alert.addButton(withTitle: L10n.s("common.cancel"))
+
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            return .overwrite
+        case .alertSecondButtonReturn:
+            return .openExisting
+        default:
+            return .cancel
         }
+    }
+
+    private func revealInFinder(_ fileURL: URL) {
+        NSWorkspace.shared.activateFileViewerSelecting([fileURL])
     }
 
     private func promptSourceFileURL() -> URL? {
@@ -918,7 +997,7 @@ struct DocumentsView: View {
             return
         }
 
-        guard let localFileURL = resolveDownloadedFileURL(for: selected.name) else {
+        guard let localFileURL = resolveDownloadedFileURL(for: selected) else {
             thumbnailImage = nil
             isLoadingThumbnail = false
             return
@@ -957,59 +1036,13 @@ struct DocumentsView: View {
         }
     }
 
-    private func resolveDownloadedFileURL(for fileName: String) -> URL? {
+    private func resolveDownloadedFileURL(for item: DocumentItem) -> URL? {
         let fileManager = FileManager.default
-        guard let downloadsDirectory = fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first
-        else {
+        guard let downloadsDirectory = try? ensureAppDownloadDirectory() else {
             return nil
         }
-        guard let fileURLs = try? fileManager.contentsOfDirectory(
-            at: downloadsDirectory,
-            includingPropertiesForKeys: [.contentModificationDateKey],
-            options: [.skipsHiddenFiles])
-        else {
-            return nil
-        }
-
-        let ext = URL(fileURLWithPath: fileName).pathExtension
-        let baseName: String
-        if ext.isEmpty {
-            baseName = fileName
-        } else {
-            baseName = String(fileName.dropLast(ext.count + 1))
-        }
-
-        let candidates = fileURLs.filter { url in
-            let candidateName = url.lastPathComponent
-            if candidateName == fileName {
-                return true
-            }
-            if ext.isEmpty {
-                guard candidateName.hasPrefix("\(baseName) ") else {
-                    return false
-                }
-                let suffix = String(candidateName.dropFirst(baseName.count + 1))
-                return Int(suffix) != nil
-            }
-            let suffix = ".\(ext)"
-            guard candidateName.hasPrefix("\(baseName) "),
-                candidateName.hasSuffix(suffix)
-            else {
-                return false
-            }
-            let numberPart = candidateName
-                .dropFirst(baseName.count + 1)
-                .dropLast(suffix.count)
-            return Int(numberPart) != nil
-        }
-
-        return candidates.max { lhs, rhs in
-            let leftDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? .distantPast
-            let rightDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? .distantPast
-            return leftDate < rightDate
-        }
+        let fileURL = downloadsDirectory.appendingPathComponent(localDownloadFileName(for: item))
+        return fileManager.fileExists(atPath: fileURL.path) ? fileURL : nil
     }
 
     private func clearSelection() {

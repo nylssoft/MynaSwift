@@ -194,6 +194,8 @@
 "documents.field.name" = "Name";
 "documents.field.type" = "Typ";
 "documents.field.size" = "Größe";
+"documents.field.localFile" = "Lokale Datei";
+"documents.showInFinder" = "Im Finder anzeigen";
 "documents.openPanel.title" = "Dokument auswählen";
 "documents.openPanel.prompt" = "Hochladen";
 "documents.savePanel.title" = "Dokument speichern";
@@ -205,7 +207,13 @@
 "documents.status.deleted.format" = "%d Element(e) gelöscht.";
 "documents.status.moved.format" = "%d Element(e) verschoben.";
 "documents.status.downloaded.format" = "%@ wurde heruntergeladen.";
+"documents.status.downloadLocation.format" = "%@ wurde gespeichert unter %@.";
 "documents.status.opened.format" = "%@ wurde geöffnet.";
+"documents.status.revealedInFinder.format" = "%@ wurde im Finder angezeigt.";
+"documents.downloadExists.title" = "Datei existiert bereits";
+"documents.downloadExists.message.format" = "Die Datei %@ existiert bereits im MynaSwift-Downloadordner. Möchten Sie sie überschreiben oder die vorhandene Datei öffnen?";
+"documents.downloadExists.overwrite" = "Überschreiben";
+"documents.downloadExists.openExisting" = "Vorhandene Datei öffnen";
 "documents.error.loginRequired" = "Melden Sie sich an, um Dokumente zu verwalten.";
 "documents.error.invalidName" = "Bitte geben Sie einen gültigen Namen ein.";
 "documents.error.setKey.download" = "Setzen Sie Ihren Datenschutzschlüssel, um Dokumente herunterzuladen.";
@@ -219,6 +227,11 @@
 "documents.error.move" = "Ausgewählte Elemente konnten nicht verschoben werden.";
 "documents.error.download" = "Dokument konnte nicht heruntergeladen werden.";
 "documents.error.open" = "Das heruntergeladene Dokument konnte nicht geöffnet werden.";
+"documents.error.downloadDirectoryPermission" = "Die Berechtigung für den Zugriff auf den Downloads-Ordner ist erforderlich.";
+
+"downloadsPermission.title" = "Zugriff auf den Downloads-Ordner";
+"downloadsPermission.message" = "MynaSwift benötigt Zugriff auf Ihren Downloads-Ordner, um heruntergeladene Dokumente zu speichern und zu öffnen.";
+"downloadsPermission.prompt" = "Zugriff erlauben";
 
 "appointments.reload" = "Termine neu laden";
 "appointments.add" = "Termin erstellen";

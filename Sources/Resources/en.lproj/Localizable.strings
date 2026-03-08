@@ -194,6 +194,8 @@
 "documents.field.name" = "Name";
 "documents.field.type" = "Type";
 "documents.field.size" = "Size";
+"documents.field.localFile" = "Local file";
+"documents.showInFinder" = "Show in Finder";
 "documents.openPanel.title" = "Choose Document";
 "documents.openPanel.prompt" = "Upload";
 "documents.savePanel.title" = "Save Document";
@@ -205,7 +207,13 @@
 "documents.status.deleted.format" = "Deleted %d item(s).";
 "documents.status.moved.format" = "Moved %d item(s).";
 "documents.status.downloaded.format" = "Downloaded %@.";
+"documents.status.downloadLocation.format" = "Saved %@ to %@.";
 "documents.status.opened.format" = "Opened %@.";
+"documents.status.revealedInFinder.format" = "Revealed %@ in Finder.";
+"documents.downloadExists.title" = "File already exists";
+"documents.downloadExists.message.format" = "The file %@ already exists in the MynaSwift download folder. Do you want to overwrite it or open the existing file?";
+"documents.downloadExists.overwrite" = "Overwrite";
+"documents.downloadExists.openExisting" = "Open existing file";
 "documents.error.loginRequired" = "Sign in to manage documents.";
 "documents.error.invalidName" = "Please enter a valid name.";
 "documents.error.setKey.download" = "Set your data protection key to download documents.";
@@ -219,6 +227,11 @@
 "documents.error.move" = "Failed to move selected items.";
 "documents.error.download" = "Failed to download document.";
 "documents.error.open" = "Failed to open downloaded document.";
+"documents.error.downloadDirectoryPermission" = "Permission to access the Downloads folder is required.";
+
+"downloadsPermission.title" = "Downloads Folder Access";
+"downloadsPermission.message" = "MynaSwift needs access to your Downloads folder to save and open downloaded documents.";
+"downloadsPermission.prompt" = "Allow Access";
 
 "appointments.reload" = "Reload appointments";
 "appointments.add" = "Create appointment";
