@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct AboutDialogView: View {
-    private let appVersion = "0.2.0"
+    private let appVersion = "0.9.0"
+    private let repositoryURL = URL(string: "https://github.com/nylssoft/MynaSwift")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -18,6 +19,11 @@ struct AboutDialogView: View {
                 .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(.secondary)
+
+            if let repositoryURL {
+                Link(L10n.s("about.repository.link"), destination: repositoryURL)
+                    .font(.footnote)
+            }
 
             Spacer(minLength: 6)
 
