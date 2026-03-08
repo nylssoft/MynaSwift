@@ -11,6 +11,13 @@ protocol CryptoServicing {
         throws -> String
     func decryptText(_ encrypted: String, encryptionKey: String, passwordManagerSalt: String)
         throws -> String
+    func encryptBinaryData(_ plainData: Data, encryptionKey: String, passwordManagerSalt: String)
+        throws -> Data
+    func decryptBinaryData(
+        _ encryptedData: Data,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) throws -> Data
 }
 
 struct CryptoService: CryptoServicing {
@@ -65,6 +72,26 @@ struct CryptoService: CryptoServicing {
         let encryptedData = try Data(hexString: encrypted)
         let plainData = try decryptData(encryptedData, key: cryptoKey)
         return String(data: plainData, encoding: .utf8) ?? ""
+    }
+
+    func encryptBinaryData(_ plainData: Data, encryptionKey: String, passwordManagerSalt: String)
+        throws -> Data
+    {
+        let cryptoKey = try deriveCryptoKey(
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+        return try encryptData(plainData, key: cryptoKey)
+    }
+
+    func decryptBinaryData(
+        _ encryptedData: Data,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) throws -> Data {
+        let cryptoKey = try deriveCryptoKey(
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+        return try decryptData(encryptedData, key: cryptoKey)
     }
 
     private func deriveSaltSymmetricKey(passwordManagerSalt: String) throws -> SymmetricKey {

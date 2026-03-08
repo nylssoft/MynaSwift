@@ -440,9 +440,18 @@ struct ContentView: View {
                     setActivityStatusBarMessage(message)
                 })
         case .documents:
-            SectionSkeletonView(
-                title: L10n.s("section.documents"),
-                subtitle: L10n.s("section.documents.subtitle"))
+            DocumentsView(
+                service: service,
+                authentication: authentication,
+                userInfo: userInfo,
+                dataProtectionSecurityKey: dataProtectionSecurityKey,
+                isLoggedIn: isLoggedIn,
+                onActivityStatusChange: { message in
+                    setActivityStatusBarMessage(message)
+                },
+                onStatusMessage: { message in
+                    showStatusBarMessage(message)
+                })
         case .passwords:
             PasswordsView(
                 service: service,

@@ -59,6 +59,26 @@ struct Note: Codable, Identifiable {
     var lastModifiedUtc: String?
 }
 
+struct DocumentItem: Codable, Identifiable {
+    let id: Int64
+    let parentID: Int64?
+    let name: String
+    let size: Int64
+    let type: String
+    let children: Int
+    let accessRole: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case parentID = "parentId"
+        case name
+        case size
+        case type
+        case children
+        case accessRole
+    }
+}
+
 struct PasswordItem: Codable, Identifiable {
     var id: UUID = UUID()
     var name: String
@@ -156,6 +176,36 @@ protocol Servicing {
         token: String, id: Int64, title: String, content: String, encryptionKey: String,
         passwordManagerSalt: String
     ) async throws -> String
+
+    // documents
+
+    func getDocumentItems(token: String, currentID: Int64?) async throws -> [DocumentItem]
+
+    func createDocumentFolder(token: String, parentID: Int64, name: String) async throws
+        -> DocumentItem
+
+    func renameDocumentItem(token: String, id: Int64, name: String) async throws
+
+    func uploadDocument(
+        token: String,
+        parentID: Int64,
+        fileName: String,
+        fileData: Data,
+        encryptionKey: String,
+        passwordManagerSalt: String,
+        overwrite: Bool
+    ) async throws
+
+    func deleteDocumentItems(token: String, parentID: Int64, ids: [Int64]) async throws
+
+    func moveDocumentItems(token: String, parentID: Int64, ids: [Int64]) async throws
+
+    func downloadDocument(
+        token: String,
+        id: Int64,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> Data
 
     // contacts
 
@@ -592,6 +642,121 @@ struct RemoteService: Servicing {
         return try JSONDecoder().decode(String.self, from: data)
     }
 
+    // documents
+
+    func getDocumentItems(token: String, currentID: Int64?) async throws -> [DocumentItem] {
+        let path: String
+        if let currentID {
+            path = "/api/document/items/\(currentID)"
+        } else {
+            path = "/api/document/items"
+        }
+        var request = URLRequest(url: URL(string: path, relativeTo: baseURL)!)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        return try JSONDecoder().decode([DocumentItem].self, from: data)
+    }
+
+    func createDocumentFolder(token: String, parentID: Int64, name: String) async throws
+        -> DocumentItem
+    {
+        var request = URLRequest(
+            url: URL(string: "/api/document/folder/\(parentID)", relativeTo: baseURL)!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.httpBody = try JSONEncoder().encode(name)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        return try JSONDecoder().decode(DocumentItem.self, from: data)
+    }
+
+    func renameDocumentItem(token: String, id: Int64, name: String) async throws {
+        var request = URLRequest(
+            url: URL(string: "/api/document/item/\(id)", relativeTo: baseURL)!)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.httpBody = try JSONEncoder().encode(name)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+    }
+
+    func uploadDocument(
+        token: String,
+        parentID: Int64,
+        fileName: String,
+        fileData: Data,
+        encryptionKey: String,
+        passwordManagerSalt: String,
+        overwrite: Bool
+    ) async throws {
+        let encryptedData = try cryptoService.encryptBinaryData(
+            fileData,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = URLRequest(
+            url: URL(string: "/api/document/upload/\(parentID)", relativeTo: baseURL)!)
+        request.httpMethod = "POST"
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.setValue(
+            "multipart/form-data; boundary=\(boundary)",
+            forHTTPHeaderField: "Content-Type")
+        request.httpBody = buildUploadDocumentBody(
+            boundary: boundary,
+            fileName: fileName,
+            encryptedData: encryptedData,
+            overwrite: overwrite)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+    }
+
+    func deleteDocumentItems(token: String, parentID: Int64, ids: [Int64]) async throws {
+        var request = URLRequest(
+            url: URL(string: "/api/document/items/\(parentID)", relativeTo: baseURL)!)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.httpBody = try JSONEncoder().encode(ids)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+    }
+
+    func moveDocumentItems(token: String, parentID: Int64, ids: [Int64]) async throws {
+        var request = URLRequest(
+            url: URL(string: "/api/document/items/\(parentID)", relativeTo: baseURL)!)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "token")
+        request.httpBody = try JSONEncoder().encode(ids)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+    }
+
+    func downloadDocument(
+        token: String,
+        id: Int64,
+        encryptionKey: String,
+        passwordManagerSalt: String
+    ) async throws -> Data {
+        var request = URLRequest(
+            url: URL(string: "/api/document/download/\(id)", relativeTo: baseURL)!)
+        request.httpMethod = "GET"
+        request.setValue(token, forHTTPHeaderField: "token")
+        let (encryptedData, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: encryptedData)
+        return try cryptoService.decryptBinaryData(
+            encryptedData,
+            encryptionKey: encryptionKey,
+            passwordManagerSalt: passwordManagerSalt)
+    }
+
     // contacts
 
     func loadContacts(
@@ -883,6 +1048,32 @@ struct RemoteService: Servicing {
         #endif
         return url
     }
+
+    private func buildUploadDocumentBody(
+        boundary: String,
+        fileName: String,
+        encryptedData: Data,
+        overwrite: Bool
+    ) -> Data {
+        var body = Data()
+        let sanitizedFileName = fileName.replacingOccurrences(of: "\"", with: "")
+
+        body.appendUTF8("--\(boundary)\r\n")
+        body.appendUTF8(
+            "Content-Disposition: form-data; name=\"document-file\"; filename=\"\(sanitizedFileName)\"\r\n"
+        )
+        body.appendUTF8("Content-Type: application/octet-stream\r\n\r\n")
+        body.append(encryptedData)
+        body.appendUTF8("\r\n")
+
+        body.appendUTF8("--\(boundary)\r\n")
+        body.appendUTF8("Content-Disposition: form-data; name=\"overwrite\"\r\n\r\n")
+        body.appendUTF8(overwrite ? "true" : "false")
+        body.appendUTF8("\r\n")
+
+        body.appendUTF8("--\(boundary)--\r\n")
+        return body
+    }
 }
 
 private struct AuthenticationRequest: Encodable {
@@ -932,4 +1123,12 @@ private struct SaveDiaryEntryRequest: Encodable {
 private struct APIErrorResponse: Decodable {
     let title: String?
     let status: Int?
+}
+
+private extension Data {
+    mutating func appendUTF8(_ value: String) {
+        if let data = value.data(using: .utf8) {
+            append(data)
+        }
+    }
 }
